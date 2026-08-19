@@ -29,9 +29,9 @@
   "vars": {
     "BUSINESS_NAME": "Boxed Indulgence",
     "CLIENT_NOTIFY_EMAIL": "REPLACE_WITH_CLIENT_EMAIL",
-    "FROM_EMAIL": "orders@REPLACE_WITH_YOUR_DOMAIN.com",
+    "FROM_EMAIL": "orders@boxedindulgence.com",
     "DEPOSIT_AMOUNT_CENTS": "5000",
     "DEPOSIT_CURRENCY": "usd",
-    "SITE_URL": "https://REPLACE_WITH_YOUR_DOMAIN.com"
+    "SITE_URL": "https://boxedindulgence.com"
   }
 }

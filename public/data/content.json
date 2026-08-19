@@ -1,23 +1,23 @@
 {
-  "_instructions": "Edit this file to update seasonal promotions, gift box menus, and testimonials — no code changes needed. Dates use YYYY-MM-DD. Redeploy after editing (see README).",
+  "_instructions": "Edit this file to update seasonal promotions, boxed meal menus, and testimonials — no code changes needed. Dates use YYYY-MM-DD. Redeploy after editing (see README).",
 
   "promotions": [
     {
       "tag": "Fall Special",
       "title": "Order 10+ Corporate Boxes, Get Free Custom Ribbon Branding",
-      "description": "Corporate gifting orders of 10 or more boxes placed for September or October ship with complimentary custom ribbon branding at no extra cost.",
+      "description": "Corporate catering orders of 10 or more boxed meals placed for September or October ship with complimentary custom ribbon branding at no extra cost.",
       "expires": "2026-10-31"
     },
     {
       "tag": "New Client",
-      "title": "10% Off Your First Wedding Favor Order",
-      "description": "First-time wedding clients get 10% off any full wedding favor box order placed at least 30 days before the event date.",
+      "title": "10% Off Your First Wedding Catering Order",
+      "description": "First-time wedding clients get 10% off any full wedding boxed meal order placed at least 30 days before the event date.",
       "expires": "2026-12-31"
     },
     {
       "tag": "Limited Time",
-      "title": "Holiday Curated Boxes Now Booking",
-      "description": "Reserve limited-edition holiday gift boxes — seasonal cheeses, preserves, and champagne truffles — before they sell out.",
+      "title": "Holiday Boxed Meals Now Booking",
+      "description": "Reserve limited-edition holiday boxed meals — seasonal cheeses, preserves, and champagne truffles — before they sell out.",
       "expires": "2026-12-24"
     }
   ],
@@ -42,9 +42,9 @@
     ],
     "weddings": [
       {
-        "name": "Favor Box Duo",
+        "name": "Wedding Guest Box Duo",
         "price": "$22 / box",
-        "description": "Mini cheese wedge, olives, dried fig, and chocolate favors — perfectly sized for wedding guest tables."
+        "description": "Mini cheese wedge, olives, dried fig, and chocolate bites — perfectly sized for wedding guest tables."
       },
       {
         "name": "Bridal Party Charcuterie Set",
@@ -79,7 +79,7 @@
   "testimonials": [
     {
       "type": "corporate",
-      "quote": "We sent these to our top 30 clients for the holidays and got more replies than any gift we've ever sent. Gorgeous presentation.",
+      "quote": "We sent these to our top 30 clients for the holidays and got more replies than anything we've ever sent. Gorgeous presentation.",
       "name": "Danielle R.",
       "context": "Operations Manager, local logistics company"
     },
@@ -91,13 +91,13 @@
     },
     {
       "type": "private",
-      "quote": "Ordered a box for my mom's birthday and she said it was the most thoughtful gift she's gotten in years. Will be a repeat customer.",
+      "quote": "Ordered a box for my mom's birthday and she said it was the most thoughtful meal she's received in years. Will be a repeat customer.",
       "name": "Priya S.",
-      "context": "Birthday gift order"
+      "context": "Birthday celebration order"
     },
     {
       "type": "corporate",
-      "quote": "Reliable, communicative, and every box is packed beautifully. Our go-to for client and employee gifting now.",
+      "quote": "Reliable, communicative, and every box is packed beautifully. Our go-to for client and employee appreciation now.",
       "name": "James O.",
       "context": "HR Director"
     }

@@ -2,7 +2,7 @@
   "name": "boxed-indulgence-site",
   "version": "1.0.0",
   "private": true,
-  "description": "Boxed Indulgence gourmet gift box site — static frontend + Cloudflare Worker API (ordering, contact, admin approval, Stripe test-mode deposits).",
+  "description": "Boxed Indulgence indulgent boxed catered meals site — static frontend + Cloudflare Worker API (ordering, contact, admin approval, Stripe test-mode deposits).",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",

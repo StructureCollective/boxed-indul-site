@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   phone TEXT,
   event_type TEXT NOT NULL,          -- corporate | wedding | private
   event_date TEXT NOT NULL,          -- YYYY-MM-DD, delivery/pickup date
-  guest_count INTEGER NOT NULL,      -- number of gift boxes
+  guest_count INTEGER NOT NULL,      -- number of boxed meals
   location TEXT,
   budget TEXT,
   notes TEXT,
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS contact_messages (
   name TEXT NOT NULL,
   email TEXT NOT NULL,
   phone TEXT,
-  guest_count INTEGER,               -- number of gift boxes
+  guest_count INTEGER,               -- number of boxed meals
   event_date TEXT,
   location TEXT,
   budget TEXT,

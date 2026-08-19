@@ -1,5 +1,5 @@
 // Minimal Resend (https://resend.com) client using fetch — no SDK dependency.
-// Free tier is plenty for a gift-box business's order/contact volume.
+// Free tier is plenty for a boxed-meal catering business's order/contact volume.
 // Set RESEND_API_KEY via: wrangler secret put RESEND_API_KEY
 
 export async function sendEmail(env, { to, subject, html, replyTo }) {
@@ -37,7 +37,7 @@ export async function sendEmail(env, { to, subject, html, replyTo }) {
 export function bookingRequestEmailToClient(env, booking) {
   return `
     <h2>New order request — ${env.BUSINESS_NAME}</h2>
-    <p><strong>${booking.name}</strong> requested a gift box order for <strong>${booking.event_date}</strong>.</p>
+    <p><strong>${booking.name}</strong> requested a boxed meal order for <strong>${booking.event_date}</strong>.</p>
     <ul>
       <li>Occasion: ${booking.event_type}</li>
       <li>Boxes: ${booking.guest_count}</li>

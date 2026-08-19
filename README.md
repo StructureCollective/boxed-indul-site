@@ -1,6 +1,6 @@
-# Boxed Indulgence — gourmet gift box site (sandbox preview)
+# Boxed Indulgence — indulgent boxed catered meals site (sandbox preview)
 
-A working mockup of an upscale gift box ordering website: Home, Order
+A working mockup of an upscale boxed catered meal ordering website: Home, Order
 (availability calendar + approval-gated deposit), Contact, and an Admin
 approval page — currently running as a **fully client-side sandbox** so it
 deploys with zero Cloudflare setup.
@@ -134,7 +134,7 @@ worker with a different name, either rename it there or update
 
 ## Editing seasonal content
 
-The "Current Promotions," "Gift Box Collections," and "Testimonials"
+The "Current Promotions," "Boxed Meal Collections," and "Testimonials"
 sections come from `public/data/content.json`. Edit the JSON, then redeploy
 — no code changes needed for routine updates. This works the same in
 sandbox or live mode.
@@ -144,14 +144,28 @@ sandbox or live mode.
 Every image on the site is a real supplied brand asset — there are no
 generated placeholder photos:
 
-- `public/img/logo.png` — full circular logo, used in the header, footer
-  favicon, and admin page.
+- `public/img/logo.png` — full circular logo, used in the header and
+  admin page.
 - `public/img/wordmark.png` — transparent wordmark lockup, available if a
   page ever needs the text-only version (not currently placed).
 - `public/img/hero-bg.jpg` — the real product photo, used as the homepage
   hero background.
 - `public/img/chef.png` — the curator illustration, used in the "Meet Your
   Curator" section on the homepage.
+- `public/img/favicon.ico`, `favicon-16.png`, `favicon-32.png`,
+  `favicon-48.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` —
+  the browser tab / bookmark / home-screen icon, cropped from the product
+  photo (the box + gold bow). Linked from every page's `<head>`.
+- `public/img/og-image.jpg` — the social share preview image (1200×630),
+  a wider crop of the same product photo. Used in the Open Graph and
+  Twitter Card meta tags on the home, order, and contact pages.
+
+Every `og:image`, `og:url`, and `twitter:image` tag points at
+`https://boxedindulgence.com/...` — social platforms need an absolute URL to
+fetch the preview image. If the site ever ends up live on a different
+domain, these need to be updated to match (find/replace across the three
+`public/*/index.html` files that have them) or the link previews won't
+show an image when the site is shared.
 
 If a social feed section gets added later (Instagram, etc.), it'll need the
 client's real handle and either manually-dropped photos or a no-code embed
