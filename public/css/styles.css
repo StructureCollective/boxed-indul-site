@@ -403,7 +403,16 @@ section.dark p { color: #c9c0ac; }
 }
 .footer-bottom a { color: var(--gold-light); text-decoration: none; }
 .footer-bottom a:hover { text-decoration: underline; }
-.footer-credit { display: block; margin-top: 6px; font-size: 0.76rem; }
+.footer-credit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 0.76rem;
+}
+.footer-credit a { display: inline-flex; align-items: center; gap: 6px; }
+.footer-credit .sc-logo { width: 16px; height: 16px; display: inline-block; }
 
 /* ---- badges / misc ---- */
 .mock-banner {
