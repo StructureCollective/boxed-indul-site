@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Must match the Worker/project name Cloudflare Workers Builds expects.
+  "name": "boxed-indul-site",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Static site files are served from here. The Worker's fetch handler
+  // routes /api/* itself and falls back to this binding for everything else.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+
+  // D1 database for orders, blocked dates, and contact form submissions.
+  // Create with: wrangler d1 create boxed-indulgence-db
+  // then paste the returned database_id below.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "boxed-indulgence-db",
+      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+    }
+  ],
+
+  // Non-secret configuration. Secrets (API keys) are set separately via
+  // `wrangler secret put <NAME>` — see README.md.
+  "vars": {
+    "BUSINESS_NAME": "Boxed Indulgence",
+    "CLIENT_NOTIFY_EMAIL": "REPLACE_WITH_CLIENT_EMAIL",
+    "FROM_EMAIL": "orders@REPLACE_WITH_YOUR_DOMAIN.com",
+    "DEPOSIT_AMOUNT_CENTS": "5000",
+    "DEPOSIT_CURRENCY": "usd",
+    "SITE_URL": "https://REPLACE_WITH_YOUR_DOMAIN.com"
+  }
+}

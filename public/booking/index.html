@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Order a Gift Box — Boxed Indulgence</title>
+<link rel="icon" href="/img/logo.png">
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<div class="mock-banner">This is a <strong>sandbox preview</strong> — order data is stored only in this browser (not sent anywhere), and the deposit step is simulated with no real payment processor connected.</div>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/img/logo.png" alt="Boxed Indulgence logo">
+      <span>Boxed <em>Indulgence</em></span>
+    </a>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">☰</button>
+    <nav class="main-nav" id="mainNav">
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/#menus">Gift Boxes</a></li>
+        <li><a href="/#testimonials">Testimonials</a></li>
+        <li><a href="/booking/" class="active">Order Now</a></li>
+        <li><a href="/contact/">Contact</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Step 1 of 2</p>
+      <h2>Check Availability &amp; Request a Delivery Date</h2>
+      <p>Pick an open date on the calendar, then tell us about your order. Every request is reviewed before it's confirmed — once approved, you'll get a secure link to pay your deposit and lock it in.</p>
+    </div>
+
+    <div class="calendar" id="calendar">
+      <div class="calendar-head">
+        <button id="prevMonth" aria-label="Previous month">←</button>
+        <h3 id="calendarLabel">Loading…</h3>
+        <button id="nextMonth" aria-label="Next month">→</button>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+      <div class="calendar-legend">
+        <span><span class="dot available"></span> Available</span>
+        <span><span class="dot selected"></span> Selected</span>
+        <span><span class="dot unavailable"></span> Unavailable</span>
+      </div>
+    </div>
+
+    <form class="form-card" id="bookingForm">
+      <div class="field">
+        <label for="event_date">Selected delivery date</label>
+        <input type="text" id="event_date" name="event_date" placeholder="Pick a date on the calendar above" readonly required>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="name">Full name</label>
+          <input type="text" id="name" name="name" required>
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" name="phone">
+        </div>
+        <div class="field">
+          <label for="event_type">Occasion</label>
+          <select id="event_type" name="event_type" required>
+            <option value="">Select one</option>
+            <option value="corporate">Corporate Gifting</option>
+            <option value="wedding">Wedding / Event Favors</option>
+            <option value="private">Personal / Celebration</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="guest_count">Number of boxes</label>
+          <input type="number" id="guest_count" name="guest_count" min="1" required>
+        </div>
+        <div class="field">
+          <label for="budget">Approximate budget</label>
+          <input type="text" id="budget" name="budget" placeholder="e.g. $500–$1,000">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="location">Delivery or pickup location</label>
+        <input type="text" id="location" name="location" placeholder="Address or venue name">
+      </div>
+
+      <div class="field">
+        <label for="notes">Anything else we should know?</label>
+        <textarea id="notes" name="notes" rows="4" placeholder="Dietary restrictions, custom ribbon color, card message, etc."></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary" id="submitBtn" style="width:100%;justify-content:center;">Request This Date</button>
+      <p class="form-note">This is a request, not a confirmed order — we'll review and follow up, usually within 1–2 business days.</p>
+      <div class="form-msg" id="formMsg"></div>
+    </form>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-bottom">© <span id="year"></span> Boxed Indulgence. Mockup site.</div>
+  </div>
+</footer>
+
+<script src="/js/main.js"></script>
+<script src="/js/mock-db.js"></script>
+<script src="/js/booking.js"></script>
+</body>
+</html>

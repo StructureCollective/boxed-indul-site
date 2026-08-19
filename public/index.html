@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boxed Indulgence — Upscale Gourmet Food Boxes</title>
+<meta name="description" content="Boxed Indulgence — upscale gourmet gift boxes for corporate gifting, weddings, and celebrations.">
+<link rel="icon" href="/img/logo.png">
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<div class="mock-banner">This is a <strong>sandbox preview</strong> — placeholder photos, sample box pricing, and a fully simulated ordering flow. Nothing here is connected to a real database or payment processor. See README for what to swap before launch.</div>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/img/logo.png" alt="Boxed Indulgence logo">
+      <span>Boxed <em>Indulgence</em></span>
+    </a>
+    <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">☰</button>
+    <nav class="main-nav" id="mainNav">
+      <ul>
+        <li><a href="/" class="active">Home</a></li>
+        <li><a href="#menus">Gift Boxes</a></li>
+        <li><a href="#testimonials">Testimonials</a></li>
+        <li><a href="/booking/">Order Now</a></li>
+        <li><a href="/contact/">Contact</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="hero" id="heroSection">
+  <div class="wrap">
+    <p class="eyebrow">Upscale Gourmet Food Boxes</p>
+    <h1>Indulgence, Beautifully Boxed</h1>
+    <p class="lede">Corporate gifting, wedding favors, and celebration boxes — hand-curated with artisan cheese, charcuterie, and fine touches, wrapped in our signature black and gold.</p>
+    <div class="hero-actions">
+      <a href="/booking/" class="btn btn-primary">Check Availability &amp; Order</a>
+      <a href="/contact/" class="btn btn-outline">Get a Quote</a>
+    </div>
+  </div>
+</section>
+
+<section id="promotions">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Currently Curating</p>
+      <h2>Current Promotions</h2>
+      <p>Updated seasonally — check back for the latest offers.</p>
+    </div>
+    <div class="promo-grid" id="promoGrid">
+      <p style="text-align:center;color:var(--muted);">Loading promotions…</p>
+    </div>
+  </div>
+</section>
+
+<section class="alt" id="instagram">
+  <div class="wrap">
+    <div class="insta-head">
+      <div>
+        <p class="eyebrow">Fresh From the Studio</p>
+        <h2 style="margin-bottom:0;">Straight Off Instagram</h2>
+      </div>
+      <a class="btn btn-outline" href="https://www.instagram.com/boxedindulgence/" target="_blank" rel="noopener">@boxedindulgence →</a>
+    </div>
+    <div class="insta-grid">
+      <a class="insta-tile" href="https://www.instagram.com/boxedindulgence/" target="_blank" rel="noopener"><img src="/img/insta-1.jpg" alt="Signature gift box"><span class="badge">Mockup</span></a>
+      <a class="insta-tile" href="https://www.instagram.com/boxedindulgence/" target="_blank" rel="noopener"><img src="/img/insta-2.jpg" alt="Charcuterie collection"><span class="badge">Mockup</span></a>
+      <a class="insta-tile" href="https://www.instagram.com/boxedindulgence/" target="_blank" rel="noopener"><img src="/img/insta-3.jpg" alt="Corporate gifting boxes"><span class="badge">Mockup</span></a>
+      <a class="insta-tile" href="https://www.instagram.com/boxedindulgence/" target="_blank" rel="noopener"><img src="/img/insta-4.jpg" alt="Wedding favor boxes"><span class="badge">Mockup</span></a>
+      <a class="insta-tile" href="https://www.instagram.com/boxedindulgence/" target="_blank" rel="noopener"><img src="/img/insta-5.jpg" alt="Holiday curation"><span class="badge">Mockup</span></a>
+      <a class="insta-tile" href="https://www.instagram.com/boxedindulgence/" target="_blank" rel="noopener"><img src="/img/insta-6.jpg" alt="Client appreciation box"><span class="badge">Mockup</span></a>
+    </div>
+    <p class="form-note" style="text-align:center;margin-top:20px;">Photos above are placeholders, and the Instagram handle is a placeholder too — see README.md — "Connecting the real Instagram feed" — for how to swap in the real handle and live photos.</p>
+  </div>
+</section>
+
+<section id="menus">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Pick Your Occasion</p>
+      <h2>Gift Box Collections</h2>
+      <p>Sample pricing shown — every order gets a custom quote based on box count and curation.</p>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="corporate">Corporate Gifting</button>
+      <button class="tab-btn" data-tab="weddings">Weddings</button>
+      <button class="tab-btn" data-tab="private">Personal &amp; Celebrations</button>
+    </div>
+    <div class="tab-panel active" id="panel-corporate"></div>
+    <div class="tab-panel" id="panel-weddings"></div>
+    <div class="tab-panel" id="panel-private"></div>
+  </div>
+</section>
+
+<section class="alt" id="testimonials">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Kind Words</p>
+      <h2>Testimonials</h2>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" data-testi="all">All</button>
+      <button class="tab-btn" data-testi="corporate">Corporate</button>
+      <button class="tab-btn" data-testi="wedding">Weddings</button>
+      <button class="tab-btn" data-testi="private">Private</button>
+    </div>
+    <div class="testi-grid" id="testiGrid"></div>
+  </div>
+</section>
+
+<section id="cta">
+  <div class="wrap" style="text-align:center;">
+    <h2>Ready to Send Something Unforgettable?</h2>
+    <p style="max-width:520px;margin:0 auto 28px;">Check date availability and submit a request in a couple minutes — we'll follow up fast with a custom quote.</p>
+    <a href="/booking/" class="btn btn-primary">Start an Order</a>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <h4>Boxed Indulgence</h4>
+        <p style="margin:0;">Upscale gourmet gift boxes for corporate gifting, weddings, and celebrations.</p>
+      </div>
+      <div>
+        <h4>Explore</h4>
+        <ul>
+          <li><a href="/#menus">Gift Boxes</a></li>
+          <li><a href="/#testimonials">Testimonials</a></li>
+          <li><a href="/booking/">Order Now</a></li>
+          <li><a href="/contact/">Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Connect</h4>
+        <ul>
+          <li><a href="https://www.instagram.com/boxedindulgence/" target="_blank" rel="noopener">Instagram</a></li>
+          <li><a href="mailto:REPLACE_WITH_CLIENT_EMAIL">Email Us</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">© <span id="year"></span> Boxed Indulgence. Mockup site — replace contact details before launch.</div>
+  </div>
+</footer>
+
+<script src="/js/main.js"></script>
+</body>
+</html>

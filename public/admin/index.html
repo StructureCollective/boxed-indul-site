@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Boxed Indulgence</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/img/logo.png">
+<link rel="stylesheet" href="/css/styles.css">
+<style>
+  .admin-wrap { max-width: 780px; margin: 60px auto; padding: 0 24px; }
+  .lock-card { max-width: 380px; margin: 100px auto; background: var(--ink-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 32px; text-align: center; }
+  .booking-row { background: var(--ink-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 24px; margin-bottom: 16px; }
+  .booking-row .top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+  .booking-row .top strong { font-size: 1.05rem; }
+  .booking-row dl { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; font-size: 0.88rem; margin: 12px 0; }
+  .booking-row dt { color: var(--muted); }
+  .booking-row dd { margin: 0; }
+  .booking-row .actions { display: flex; gap: 10px; margin-top: 14px; }
+  .booking-row .actions .btn { padding: 10px 20px; font-size: 0.78rem; }
+  .admin-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+  .admin-section { margin-top: 44px; }
+  .admin-section .section-head { text-align: left; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<div class="mock-banner">Sandbox admin view — data lives only in this browser's storage. Passcode is <strong>preview</strong> (change it in <code>/js/admin.js</code>).</div>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/img/logo.png" alt="Boxed Indulgence logo">
+      <span>Boxed <em>Indulgence</em> <small style="color:var(--muted);font-size:0.7rem;">/ admin</small></span>
+    </a>
+  </div>
+</header>
+
+<div id="lockScreen" class="lock-card">
+  <h3 style="margin-bottom:16px;">Admin Access</h3>
+  <div class="field" style="text-align:left;">
+    <label for="adminKey">Passcode</label>
+    <input type="password" id="adminKey" placeholder="Enter admin passcode">
+  </div>
+  <button class="btn btn-primary" id="unlockBtn" style="width:100%;justify-content:center;margin-top:8px;">Unlock</button>
+  <p class="form-note" id="lockMsg"></p>
+</div>
+
+<div class="admin-wrap" id="adminPanel" style="display:none;">
+  <div class="section-head" style="text-align:left;margin-bottom:8px;">
+    <p class="eyebrow">Pending Requests</p>
+    <h2 style="margin-bottom:6px;">Order Approvals</h2>
+    <p>Approve to generate a deposit link (simulated — no real charge), or reject to release the date.</p>
+  </div>
+  <div class="admin-toolbar">
+    <button class="btn btn-outline" id="refreshBtn">Refresh</button>
+    <button class="btn btn-outline" id="resetBtn" style="border-color:var(--maroon);color:#d98f8f;">Reset All Sandbox Data</button>
+  </div>
+  <div id="pendingList"></div>
+
+  <div class="admin-section" id="approvedSection">
+    <div class="section-head">
+      <p class="eyebrow">Awaiting Deposit</p>
+      <h2 style="margin-bottom:6px;">Approved</h2>
+    </div>
+    <div id="approvedList"></div>
+  </div>
+
+  <div class="admin-section" id="confirmedSection">
+    <div class="section-head">
+      <p class="eyebrow">Locked In</p>
+      <h2 style="margin-bottom:6px;">Confirmed</h2>
+    </div>
+    <div id="confirmedList"></div>
+  </div>
+</div>
+
+<script src="/js/mock-db.js"></script>
+<script src="/js/admin.js"></script>
+</body>
+</html>

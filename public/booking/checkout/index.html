@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deposit Payment — Boxed Indulgence</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/img/logo.png">
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<div class="mock-banner">This is a <strong>simulated payment page</strong> — no real card processor is connected. Please don't enter real card details.</div>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/img/logo.png" alt="Boxed Indulgence logo">
+      <span>Boxed <em>Indulgence</em></span>
+    </a>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Step 2 of 2</p>
+      <h2>Secure Your Order</h2>
+      <p id="summaryText">Loading your order…</p>
+    </div>
+
+    <form class="form-card" id="checkoutForm" style="display:none;">
+      <div class="field">
+        <label for="cardName">Name on card</label>
+        <input type="text" id="cardName" placeholder="Jane Doe" required>
+      </div>
+      <div class="field">
+        <label for="cardNumber">Card number</label>
+        <input type="text" id="cardNumber" placeholder="4242 4242 4242 4242" maxlength="19" required>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="cardExpiry">Expiry</label>
+          <input type="text" id="cardExpiry" placeholder="MM / YY" maxlength="7" required>
+        </div>
+        <div class="field">
+          <label for="cardCvc">CVC</label>
+          <input type="text" id="cardCvc" placeholder="123" maxlength="4" required>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary" id="payBtn" style="width:100%;justify-content:center;">Pay Deposit</button>
+      <p class="form-note">This form doesn't process real payments — any values work. Nothing you enter here is stored or sent anywhere.</p>
+    </form>
+
+    <div class="form-card" id="notFoundCard" style="display:none;text-align:center;">
+      <p style="margin:0;">We couldn't find that order, or it isn't approved yet.</p>
+      <a href="/booking/" class="btn btn-outline" style="margin-top:16px;">Back to Ordering</a>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-bottom">© <span id="year"></span> Boxed Indulgence. Sandbox preview.</div>
+  </div>
+</footer>
+
+<script src="/js/main.js"></script>
+<script src="/js/mock-db.js"></script>
+<script src="/js/checkout.js"></script>
+</body>
+</html>

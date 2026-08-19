@@ -1,0 +1,105 @@
+{
+  "_instructions": "Edit this file to update seasonal promotions, gift box menus, and testimonials — no code changes needed. Dates use YYYY-MM-DD. Redeploy after editing (see README).",
+
+  "promotions": [
+    {
+      "tag": "Fall Special",
+      "title": "Order 10+ Corporate Boxes, Get Free Custom Ribbon Branding",
+      "description": "Corporate gifting orders of 10 or more boxes placed for September or October ship with complimentary custom ribbon branding at no extra cost.",
+      "expires": "2026-10-31"
+    },
+    {
+      "tag": "New Client",
+      "title": "10% Off Your First Wedding Favor Order",
+      "description": "First-time wedding clients get 10% off any full wedding favor box order placed at least 30 days before the event date.",
+      "expires": "2026-12-31"
+    },
+    {
+      "tag": "Limited Time",
+      "title": "Holiday Curated Boxes Now Booking",
+      "description": "Reserve limited-edition holiday gift boxes — seasonal cheeses, preserves, and champagne truffles — before they sell out.",
+      "expires": "2026-12-24"
+    }
+  ],
+
+  "menus": {
+    "corporate": [
+      {
+        "name": "Executive Gifting Box",
+        "price": "$45 / box",
+        "description": "Artisan cheese, cured meats, crackers, and preserves in our signature black box with gold ribbon. Minimum 10 boxes."
+      },
+      {
+        "name": "Boardroom Indulgence Crate",
+        "price": "$68 / box",
+        "description": "Premium cheese selection, charcuterie, dried fruit, nuts, and a bottle of sparkling cider. Minimum 15 boxes."
+      },
+      {
+        "name": "Client Appreciation Collection",
+        "price": "$95 / box",
+        "description": "Our most lavish spread — imported cheeses, fig preserves, honeycomb, chocolates, and a custom branded card. Minimum 20 boxes."
+      }
+    ],
+    "weddings": [
+      {
+        "name": "Favor Box Duo",
+        "price": "$22 / box",
+        "description": "Mini cheese wedge, olives, dried fig, and chocolate favors — perfectly sized for wedding guest tables."
+      },
+      {
+        "name": "Bridal Party Indulgence Set",
+        "price": "$58 / box",
+        "description": "A luxe curated box for the bridal party — cheese, charcuterie, sparkling cider, and a handwritten thank-you note."
+      },
+      {
+        "name": "Reception Grazing Collection",
+        "price": "Custom quote",
+        "description": "Boxed grazing stations styled to your reception, sized for any guest count."
+      }
+    ],
+    "private": [
+      {
+        "name": "Signature Indulgence Box",
+        "price": "$52 / box",
+        "description": "Black gift box, gold bow, artisan cheese, dark grapes, olives, fig, and rosemary garnish — our most popular gift."
+      },
+      {
+        "name": "Celebration Collection",
+        "price": "$64 / box",
+        "description": "Great for birthdays, anniversaries, and thank-yous — cheese, charcuterie, chocolate, and a bottle of sparkling cider."
+      },
+      {
+        "name": "Custom Curated Box",
+        "price": "Custom quote",
+        "description": "Tell us the occasion and dietary needs — we'll hand-curate a box built around it."
+      }
+    ]
+  },
+
+  "testimonials": [
+    {
+      "type": "corporate",
+      "quote": "We sent these to our top 30 clients for the holidays and got more replies than any gift we've ever sent. Gorgeous presentation.",
+      "name": "Danielle R.",
+      "context": "Operations Manager, local logistics company"
+    },
+    {
+      "type": "wedding",
+      "quote": "Our guests kept the boxes as keepsakes. The gold ribbon and packaging alone made them feel so special — and everything inside was delicious.",
+      "name": "Marcus & Teigan",
+      "context": "Wedding reception, 140 guests"
+    },
+    {
+      "type": "private",
+      "quote": "Ordered a box for my mom's birthday and she said it was the most thoughtful gift she's gotten in years. Will be a repeat customer.",
+      "name": "Priya S.",
+      "context": "Birthday gift order"
+    },
+    {
+      "type": "corporate",
+      "quote": "Reliable, communicative, and every box is packed beautifully. Our go-to for client and employee gifting now.",
+      "name": "James O.",
+      "context": "HR Director"
+    }
+  ]
+}

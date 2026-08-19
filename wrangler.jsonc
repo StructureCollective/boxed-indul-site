@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Must match the Worker/project name Cloudflare Workers Builds expects.
+  "name": "boxed-indul-site",
+  "compatibility_date": "2026-08-01",
+
+  // SANDBOX MODE: this Worker serves static files only — no "main" script,
+  // no bindings, no secrets. The booking/contact/admin flow runs entirely
+  // in the browser (see public/js/mock-db.js), so nothing here needs any
+  // Cloudflare setup beyond connecting the repo. Deploys as-is.
+  "assets": {
+    "directory": "./public"
+  }
+
+  // Going live later? The real D1 + Stripe + Resend backend is already
+  // built — see going-live-reference/ and the "Going live" section in
+  // README.md for how to switch this config back on.
+}

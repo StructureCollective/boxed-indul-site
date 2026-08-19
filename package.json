@@ -1,0 +1,15 @@
+{
+  "name": "boxed-indulgence-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Boxed Indulgence gourmet gift box site — static frontend + Cloudflare Worker API (ordering, contact, admin approval, Stripe test-mode deposits).",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:init": "wrangler d1 execute boxed-indulgence-db --file=./schema.sql",
+    "db:init:remote": "wrangler d1 execute boxed-indulgence-db --remote --file=./schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
