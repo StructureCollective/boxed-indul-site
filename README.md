@@ -30,6 +30,17 @@ To try the full loop: submit a request on `/booking/`, then open `/admin/`
 that appears to simulate the customer paying. There's a "Reset All Sandbox
 Data" button on the admin page if you want to clear everything between demos.
 
+### Accessing the admin page
+
+Go to `/admin/` on the deployed site (e.g. `https://your-site-url.com/admin/`
+— or `http://localhost:8000/admin/` if you're previewing it locally). Enter
+the passcode **`preview`** to unlock it. It's a link only — there's no
+button for it anywhere on the public pages, by design, so customers don't
+stumble onto it. Bookmark the URL once you know it. Remember this passcode
+is a soft demo gate, not real security (see above) — swap it for something
+private before sharing the site link with anyone outside your team, and
+replace it entirely with real authentication before going live.
+
 ## Going live later
 
 The real backend — Cloudflare D1 for storage, Stripe (test or live mode) for
@@ -128,30 +139,24 @@ sections come from `public/data/content.json`. Edit the JSON, then redeploy
 — no code changes needed for routine updates. This works the same in
 sandbox or live mode.
 
-## Home page food photos / Instagram grid
-
-Currently placeholder images, and the Instagram handle (`@boxedindulgence`)
-is a **placeholder guess** — no real handle was provided yet. Update the
-`href` on every Instagram link in `public/index.html` (and the footer) once
-you have the real one. Instagram's API requires the client's own Instagram
-Business account connected through Meta's Graph API (there's no public
-scraping option anymore). Options, roughly in order of effort:
-
-1. Manually drop the client's best photos into `public/img/`, replacing
-   `insta-1.jpg` … `insta-6.jpg`.
-2. Use a no-code embed widget (SnapWidget, Elfsight) — drop their embed
-   snippet into `public/index.html` in place of the `.insta-grid`.
-3. Build a real Graph API integration once the client can grant API access.
-
 ## Brand assets
 
-`public/img/logo.png` (full circular logo), `public/img/wordmark.png`
-(transparent wordmark lockup), `public/img/hero-bg.jpg` (real product photo,
-used as the homepage hero background), and `public/img/chef.png` (chef
-avatar illustration — not currently placed on a page, but available for an
-About/Meet the Curator section if the client wants one added) are the real
-supplied brand assets. Everything else under `public/img/` (`insta-*.jpg`,
-`menu-bg.jpg`) is a generated placeholder, clearly labeled as such.
+Every image on the site is a real supplied brand asset — there are no
+generated placeholder photos:
+
+- `public/img/logo.png` — full circular logo, used in the header, footer
+  favicon, and admin page.
+- `public/img/wordmark.png` — transparent wordmark lockup, available if a
+  page ever needs the text-only version (not currently placed).
+- `public/img/hero-bg.jpg` — the real product photo, used as the homepage
+  hero background.
+- `public/img/chef.png` — the curator illustration, used in the "Meet Your
+  Curator" section on the homepage.
+
+If a social feed section gets added later (Instagram, etc.), it'll need the
+client's real handle and either manually-dropped photos or a no-code embed
+widget (SnapWidget, Elfsight) — Instagram's API requires the client's own
+Business account connected through Meta's Graph API.
 
 ## Project structure
 
@@ -164,7 +169,7 @@ public/admin/index.html          Admin approval page
 public/js/mock-db.js             Sandbox "database" (localStorage) — sandbox only
 public/js/booking.js, contact.js, admin.js, checkout.js   Sandbox frontend logic
 public/data/content.json         Editable seasonal content (promos/boxes/testimonials)
-public/img/                      Logo, wordmark, hero photo, chef avatar + placeholder photos
+public/img/                      Logo, wordmark, hero photo, chef avatar — all real brand assets
 src/                              Real backend (D1 + Stripe + Resend) — not currently wired in
 going-live-reference/             Archived live frontend JS + wrangler config, for later
 schema.sql                        D1 database schema (for going-live)

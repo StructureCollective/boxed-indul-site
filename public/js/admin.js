@@ -25,7 +25,7 @@ function unlock() {
 
   if (key !== ADMIN_PASSCODE) {
     msg.textContent = "Incorrect passcode.";
-    msg.style.color = "#d98f8f";
+    msg.style.color = "#7a2e2e";
     return;
   }
 

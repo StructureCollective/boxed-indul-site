@@ -25,19 +25,19 @@
   "menus": {
     "corporate": [
       {
-        "name": "Executive Gifting Box",
-        "price": "$45 / box",
-        "description": "Artisan cheese, cured meats, crackers, and preserves in our signature black box with gold ribbon. Minimum 10 boxes."
+        "name": "Upscale Lunch Box",
+        "price": "$24 / box",
+        "description": "A refined individual lunch — artisan sandwich or seasonal salad, fruit, cheese, and a sweet treat, boxed in our signature black and gold. Great for meetings and client lunches. Minimum 8 boxes."
       },
       {
-        "name": "Boardroom Indulgence Crate",
+        "name": "Boardroom Charcuterie Crate",
         "price": "$68 / box",
         "description": "Premium cheese selection, charcuterie, dried fruit, nuts, and a bottle of sparkling cider. Minimum 15 boxes."
       },
       {
-        "name": "Client Appreciation Collection",
+        "name": "Client Appreciation Charcuterie Collection",
         "price": "$95 / box",
-        "description": "Our most lavish spread — imported cheeses, fig preserves, honeycomb, chocolates, and a custom branded card. Minimum 20 boxes."
+        "description": "Our most elegant spread — imported cheeses, fig preserves, honeycomb, chocolates, and a custom branded card. Minimum 20 boxes."
       }
     ],
     "weddings": [
@@ -47,31 +47,31 @@
         "description": "Mini cheese wedge, olives, dried fig, and chocolate favors — perfectly sized for wedding guest tables."
       },
       {
-        "name": "Bridal Party Indulgence Set",
+        "name": "Bridal Party Charcuterie Set",
         "price": "$58 / box",
         "description": "A luxe curated box for the bridal party — cheese, charcuterie, sparkling cider, and a handwritten thank-you note."
       },
       {
-        "name": "Reception Grazing Collection",
+        "name": "Reception Charcuterie Grazing Collection",
         "price": "Custom quote",
         "description": "Boxed grazing stations styled to your reception, sized for any guest count."
       }
     ],
     "private": [
       {
-        "name": "Signature Indulgence Box",
-        "price": "$52 / box",
-        "description": "Black gift box, gold bow, artisan cheese, dark grapes, olives, fig, and rosemary garnish — our most popular gift."
+        "name": "Signature Lunch Box",
+        "price": "$28 / box",
+        "description": "A beautifully boxed lunch for one — artisan sandwich or seasonal salad, fruit, cheese, and a sweet treat, wrapped in gold ribbon."
       },
       {
-        "name": "Celebration Collection",
+        "name": "Celebration Charcuterie Collection",
         "price": "$64 / box",
         "description": "Great for birthdays, anniversaries, and thank-yous — cheese, charcuterie, chocolate, and a bottle of sparkling cider."
       },
       {
         "name": "Custom Curated Box",
         "price": "Custom quote",
-        "description": "Tell us the occasion and dietary needs — we'll hand-curate a box built around it."
+        "description": "Tell us the occasion and dietary needs — we'll hand-curate a box built around it, from a simple lunch box to a full charcuterie spread."
       }
     ]
   },
