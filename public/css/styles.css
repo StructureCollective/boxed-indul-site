@@ -401,6 +401,9 @@ section.dark p { color: #c9c0ac; }
   border-top: 1px solid rgba(250,246,238,0.12);
   padding-top: 24px;
 }
+.footer-bottom a { color: var(--gold-light); text-decoration: none; }
+.footer-bottom a:hover { text-decoration: underline; }
+.footer-credit { display: block; margin-top: 6px; font-size: 0.76rem; }
 
 /* ---- badges / misc ---- */
 .mock-banner {
