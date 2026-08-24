@@ -13,7 +13,8 @@
     "binding": "ASSETS"
   },
 
-  // D1 database for orders, blocked dates, and contact form submissions.
+  // D1 database for orders, blocked dates, contact messages, lunch-sale
+  // events/orders, signups, and the Google Calendar connection.
   // Create with: wrangler d1 create boxed-indulgence-db
   // then paste the returned database_id below.
   "d1_databases": [
@@ -24,14 +25,48 @@
     }
   ],
 
-  // Non-secret configuration. Secrets (API keys) are set separately via
-  // `wrangler secret put <NAME>` — see README.md.
+  // Non-secret configuration. True secrets (API keys, OAuth client secret)
+  // are set separately via `wrangler secret put <NAME>` — see README.md.
+  // GOOGLE_CLIENT_ID is not secret (only the client SECRET is) so it's fine
+  // to keep here in plain vars.
   "vars": {
     "BUSINESS_NAME": "Boxed Indulgence",
-    "CLIENT_NOTIFY_EMAIL": "REPLACE_WITH_CLIENT_EMAIL",
+    "CLIENT_NOTIFY_EMAIL": "boxedindulgenceadmin@gmail.com",
     "FROM_EMAIL": "orders@boxedindulgence.com",
-    "DEPOSIT_AMOUNT_CENTS": "5000",
+
+    // Custom-order deposit: percentage of the itemized order total.
+    "DEPOSIT_PERCENT": "50",
     "DEPOSIT_CURRENCY": "usd",
+    // Fallback deposit if an order somehow has no computed total (shouldn't
+    // normally happen once the itemized form is in place).
+    "DEPOSIT_MIN_CENTS": "5000",
+
+    // Deposit link expiry: Stripe Checkout Sessions cap at 24h, so anything
+    // longer is enforced at the app level (see deposit_link_expires_at in
+    // schema.sql) rather than by Stripe itself.
+    "DEPOSIT_LINK_EXPIRY_HOURS": "72",
+
+    // Admin login is handled by Cloudflare Access (Zero Trust), not this
+    // Worker — restrict /admin/* to these emails in the Access policy:
+    //   boxedindulgenceadmin@gmail.com, admin@structurecollective.com
+    // The Worker just trusts the Cf-Access-Jwt-Assertion header Access adds.
+
+    "GOOGLE_CLIENT_ID": "414049872483-8tcdg0edkb73fvfn98r9afvs0d5hk9a7.apps.googleusercontent.com",
+    "GOOGLE_REDIRECT_URI": "https://boxedindulgence.com/api/admin/google/callback",
+
+    // From the Access application's Overview tab once it's created in the
+    // Cloudflare Zero Trust dashboard (Access > Applications). Needed so
+    // the Worker can verify the Cf-Access-Jwt-Assertion header itself.
+    "CF_ACCESS_TEAM_DOMAIN": "REPLACE_WITH_YOUR_TEAM.cloudflareaccess.com",
+    "CF_ACCESS_AUD": "REPLACE_WITH_YOUR_ACCESS_APPLICATION_AUD_TAG",
+
     "SITE_URL": "https://boxedindulgence.com"
+  },
+
+  // Daily pull-sync from the connected Google Calendar (see scheduled() in
+  // src/index.js) — 06:00 UTC ≈ 1-2am Eastern, well before any lunch-sale
+  // cutoffs or same-day availability checks.
+  "triggers": {
+    "crons": ["0 6 * * *"]
   }
 }
