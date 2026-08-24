@@ -12,7 +12,7 @@
 </head>
 <body>
 
-<div class="mock-banner">This is a <strong>simulated payment page</strong> — no real card processor is connected. Please don't enter real card details.</div>
+<div class="mock-banner" id="mockBanner">This is a <strong>simulated payment page</strong> — no real card processor is connected. Please don't enter real card details.</div>
 
 <header class="site-header">
   <div class="wrap">
@@ -31,28 +31,17 @@
       <p id="summaryText">Loading your order…</p>
     </div>
 
-    <form class="form-card" id="checkoutForm" style="display:none;">
-      <div class="field">
-        <label for="cardName">Name on card</label>
-        <input type="text" id="cardName" placeholder="Jane Doe" required>
-      </div>
-      <div class="field">
-        <label for="cardNumber">Card number</label>
-        <input type="text" id="cardNumber" placeholder="4242 4242 4242 4242" maxlength="19" required>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="cardExpiry">Expiry</label>
-          <input type="text" id="cardExpiry" placeholder="MM / YY" maxlength="7" required>
-        </div>
-        <div class="field">
-          <label for="cardCvc">CVC</label>
-          <input type="text" id="cardCvc" placeholder="123" maxlength="4" required>
-        </div>
-      </div>
-      <button type="submit" class="btn btn-primary" id="payBtn" style="width:100%;justify-content:center;">Pay Deposit</button>
-      <p class="form-note">This form doesn't process real payments — any values work. Nothing you enter here is stored or sent anywhere.</p>
-    </form>
+    <div class="form-card" id="payCard" style="display:none;text-align:center;">
+      <div class="order-summary" id="orderSummary" style="display:block;"></div>
+      <button class="btn btn-primary" id="payBtn" style="width:100%;justify-content:center;">Pay Deposit Securely</button>
+      <p class="form-note" id="payNote"></p>
+    </div>
+
+    <div class="form-card" id="expiredCard" style="display:none;text-align:center;">
+      <p style="margin:0;">This deposit link has expired.</p>
+      <p class="form-note">Reply to your approval email (or contact us) and we'll send a fresh one.</p>
+      <a href="/contact/" class="btn btn-outline" style="margin-top:16px;">Contact Us</a>
+    </div>
 
     <div class="form-card" id="notFoundCard" style="display:none;text-align:center;">
       <p style="margin:0;">We couldn't find that order, or it isn't approved yet.</p>
@@ -64,7 +53,7 @@
 <footer class="site-footer">
   <div class="wrap">
     <div class="footer-bottom">
-      © <span id="year"></span> Boxed Indulgence. Sandbox preview.
+      © <span id="year"></span> Boxed Indulgence.
       <span class="footer-credit">Built by <a href="https://structurecollective.com" target="_blank" rel="noopener"><img src="/img/sc-logo.png" alt="" class="sc-logo">Structure Collective</a></span>
     </div>
   </div>

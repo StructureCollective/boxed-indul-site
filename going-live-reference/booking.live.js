@@ -1,4 +1,4 @@
-// Availability calendar + booking request form.
+// Availability calendar + itemized-menu booking request form (live/API version).
 
 const state = {
   viewYear: null,
@@ -16,6 +16,13 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("nextMonth").addEventListener("click", () => shiftMonth(1));
 
   loadMonth();
+
+  MenuSelector.init({
+    guestCountElId: "guest_count",
+    tabsElId: "menuTabs",
+    panelsElId: "menuPanels",
+    summaryElId: "orderSummary",
+  });
 
   const form = document.getElementById("bookingForm");
   form.addEventListener("submit", onSubmit);
@@ -131,15 +138,19 @@ async function onSubmit(e) {
     showMsg(msgEl, "error", "Please select a date on the calendar first.");
     return;
   }
+  if (!MenuSelector.isComplete()) {
+    showMsg(msgEl, "error", "Please pick your entrée / board / box collection above.");
+    return;
+  }
 
   const payload = {
+    ...MenuSelector.getSelection(),
     name: document.getElementById("name").value.trim(),
     email: document.getElementById("email").value.trim(),
     phone: document.getElementById("phone").value.trim(),
     event_type: document.getElementById("event_type").value,
     event_date: rawDate,
     guest_count: Number(document.getElementById("guest_count").value),
-    budget: document.getElementById("budget").value.trim(),
     location: document.getElementById("location").value.trim(),
     notes: document.getElementById("notes").value.trim(),
   };
@@ -165,7 +176,9 @@ async function onSubmit(e) {
     showMsg(
       msgEl,
       "success",
-      "Request sent! We'll review it and follow up by email — usually within 1–2 business days."
+      data.has_quoted_items
+        ? "Request sent! Because your order includes custom/quoted items, we'll follow up by email with final pricing before sending your deposit link."
+        : "Request sent! We'll review it and follow up by email — usually within 1–2 business days."
     );
     document.getElementById("bookingForm").reset();
     document.getElementById("event_date").dataset.raw = "";

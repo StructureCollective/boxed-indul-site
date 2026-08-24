@@ -424,6 +424,78 @@ section.dark p { color: #c9c0ac; }
 }
 .mock-banner strong { color: var(--gold-light); }
 
+/* ============================================================
+   Order form — menu selection cards + running total
+   ============================================================ */
+.menu-note { font-size: 0.85rem; color: var(--muted); margin: -8px 0 18px; }
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.menu-option {
+  display: block;
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  cursor: pointer;
+  background: var(--ink-2, var(--white));
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.menu-option:hover { border-color: var(--rust); }
+.menu-option input { position: absolute; opacity: 0; pointer-events: none; }
+.menu-option .opt-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.menu-option .opt-name { font-weight: 600; color: var(--black); }
+.menu-option .opt-price { font-size: 0.85rem; color: var(--rust); white-space: nowrap; }
+.menu-option .opt-desc { font-size: 0.82rem; color: var(--muted); margin-top: 6px; }
+.menu-option:has(input:checked) { border-color: var(--rust); background: rgba(182,134,47,0.08); }
+.menu-option:has(input:checked) .opt-name { color: var(--rust-dark); }
+
+.order-summary {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  background: var(--cream-2);
+}
+.order-summary .line { display: flex; justify-content: space-between; font-size: 0.88rem; padding: 4px 0; color: var(--ink); }
+.order-summary .line.quoted { color: var(--muted); font-style: italic; }
+.order-summary .total { display: flex; justify-content: space-between; font-weight: 700; font-size: 1.05rem; padding-top: 10px; margin-top: 8px; border-top: 1px solid var(--line); color: var(--black); }
+.order-summary .deposit-note { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+
+/* ============================================================
+   Admin searchable tables
+   ============================================================ */
+.admin-search { max-width: 340px; margin-bottom: 16px; }
+.admin-search input {
+  width: 100%; padding: 10px 14px; border: 1px solid var(--line); border-radius: 6px;
+  font-family: var(--font-body); font-size: 0.9rem;
+}
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+table.data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 720px; }
+table.data-table th, table.data-table td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.data-table th { background: var(--cream-2); font-weight: 700; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em; color: var(--muted); }
+table.data-table tbody tr:hover { background: rgba(182,134,47,0.06); }
+table.data-table td.wrap-cell { white-space: normal; max-width: 220px; }
+table.data-table .row-actions { display: flex; gap: 8px; }
+table.data-table .row-actions .btn { padding: 6px 12px; font-size: 0.7rem; }
+
+/* ============================================================
+   Lunch-sale event (homepage block + order page)
+   ============================================================ */
+.lunch-card {
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 28px;
+  background: var(--ink-2, var(--white)); box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.lunch-card .slots-left { display: inline-block; padding: 4px 10px; border-radius: 999px; background: rgba(85,96,63,0.12); color: var(--green-dark); font-size: 0.75rem; font-weight: 700; margin-bottom: 10px; }
+.lunch-card .slots-left.low { background: rgba(122,46,46,0.1); color: var(--maroon); }
+.lunch-none-card { text-align: center; padding: 48px 24px; border: 1px dashed var(--line); border-radius: var(--radius); }
+.qty-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.qty-row button { width: 36px; height: 36px; border: 1px solid var(--line); background: var(--white); border-radius: 6px; font-size: 1.1rem; cursor: pointer; }
+.qty-row input { width: 60px; text-align: center; padding: 8px; border: 1px solid var(--line); border-radius: 6px; font-family: var(--font-body); }
+
 .status-pill {
   display: inline-block;
   padding: 4px 12px;

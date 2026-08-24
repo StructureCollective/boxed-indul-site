@@ -1,7 +1,5 @@
-// Availability calendar + order request form — sandbox version.
-// Reads/writes MockDB (localStorage) instead of calling a server.
-
-const DEPOSIT_AMOUNT_CENTS = 5000; // $50 flat, matches the going-live reference default
+// Availability calendar + itemized-menu booking request form (sandbox
+// preview version — writes to MockDB/localStorage instead of a real API).
 
 const state = {
   viewYear: null,
@@ -20,26 +18,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loadMonth();
 
+  MenuSelector.init({
+    guestCountElId: "guest_count",
+    tabsElId: "menuTabs",
+    panelsElId: "menuPanels",
+    summaryElId: "orderSummary",
+  });
+
   const form = document.getElementById("bookingForm");
   form.addEventListener("submit", onSubmit);
 
   const params = new URLSearchParams(window.location.search);
   const msgEl = document.getElementById("formMsg");
   if (params.get("paid") === "1") {
-    showMsg(msgEl, "success", "Deposit received! Your date is confirmed. (Simulated — no real charge occurred.)");
+    showMsg(msgEl, "success", "Deposit received! Your date is confirmed — check your email for details.");
   } else if (params.get("canceled") === "1") {
-    showMsg(msgEl, "error", "Deposit payment was canceled.");
+    showMsg(msgEl, "error", "Deposit payment was canceled. You can retry from the approval email whenever you're ready.");
   }
 });
 
-function shiftMonth(delta) {
+async function shiftMonth(delta) {
   state.viewMonth += delta;
   if (state.viewMonth < 0) { state.viewMonth = 11; state.viewYear -= 1; }
   if (state.viewMonth > 11) { state.viewMonth = 0; state.viewYear += 1; }
-  loadMonth();
+  await loadMonth();
 }
 
-function loadMonth() {
+async function loadMonth() {
   const monthStr = `${state.viewYear}-${String(state.viewMonth + 1).padStart(2, "0")}`;
   document.getElementById("calendarLabel").textContent = new Date(
     state.viewYear,
@@ -119,58 +124,53 @@ function formatDateNice(dateStr) {
 function onSubmit(e) {
   e.preventDefault();
   const msgEl = document.getElementById("formMsg");
-  const submitBtn = document.getElementById("submitBtn");
   const rawDate = document.getElementById("event_date").dataset.raw;
 
   if (!rawDate) {
     showMsg(msgEl, "error", "Please select a date on the calendar first.");
     return;
   }
-
-  const name = document.getElementById("name").value.trim();
-  const email = document.getElementById("email").value.trim();
-  const eventType = document.getElementById("event_type").value;
-  const guestCount = Number(document.getElementById("guest_count").value);
-
-  if (!name || !email || !eventType || !guestCount) {
-    showMsg(msgEl, "error", "Please fill in all required fields.");
+  if (!MenuSelector.isComplete()) {
+    showMsg(msgEl, "error", "Please pick your entrée / board / box collection above.");
     return;
   }
 
+  const { total, hasQuoted } = MenuSelector.computeTotal();
+  const depositPercent = 50;
+
   const booking = {
     id: MockDB.newId(),
-    name,
-    email,
+    ...MenuSelector.getSelection(),
+    name: document.getElementById("name").value.trim(),
+    email: document.getElementById("email").value.trim(),
     phone: document.getElementById("phone").value.trim(),
-    event_type: eventType,
+    event_type: document.getElementById("event_type").value,
     event_date: rawDate,
-    guest_count: guestCount,
-    budget: document.getElementById("budget").value.trim(),
+    guest_count: Number(document.getElementById("guest_count").value),
     location: document.getElementById("location").value.trim(),
     notes: document.getElementById("notes").value.trim(),
+    order_total_cents: total,
+    deposit_percent: depositPercent,
+    deposit_amount_cents: Math.round((total * depositPercent) / 100) || 5000,
     status: "pending_approval",
-    deposit_amount_cents: DEPOSIT_AMOUNT_CENTS,
     created_at: MockDB.nowIso(),
     updated_at: MockDB.nowIso(),
   };
 
-  submitBtn.disabled = true;
-  submitBtn.textContent = "Sending…";
+  MockDB.addBooking(booking);
 
-  // Simulate a brief network delay so the UX still feels real.
-  setTimeout(() => {
-    MockDB.addBooking(booking);
-    showMsg(
-      msgEl,
-      "success",
-      "Request sent! In the live site this notifies the business owner by email — for this preview, open /admin/ to review and approve it."
-    );
-    document.getElementById("bookingForm").reset();
-    document.getElementById("event_date").dataset.raw = "";
-    state.selectedDate = null;
-    submitBtn.textContent = "Request Sent";
-    loadMonth();
-  }, 400);
+  showMsg(
+    msgEl,
+    "success",
+    hasQuoted
+      ? "Request sent! Because your order includes custom/quoted items, we'd follow up with final pricing before sending your deposit link."
+      : "Request sent! We'll review it and follow up by email — usually within 1–2 business days."
+  );
+  document.getElementById("bookingForm").reset();
+  document.getElementById("event_date").dataset.raw = "";
+  state.selectedDate = null;
+  document.getElementById("submitBtn").textContent = "Request Sent";
+  loadMonth();
 }
 
 function showMsg(el, type, text) {

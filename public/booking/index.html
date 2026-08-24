@@ -27,7 +27,7 @@
 </head>
 <body>
 
-<div class="mock-banner">This is a <strong>sandbox preview</strong> — order data is stored only in this browser (not sent anywhere), and the deposit step is simulated with no real payment processor connected.</div>
+<div class="mock-banner" id="mockBanner">This is a <strong>sandbox preview</strong> — order data is stored only in this browser (not sent anywhere), and the deposit step is simulated with no real payment processor connected.</div>
 
 <header class="site-header">
   <div class="wrap">
@@ -42,6 +42,7 @@
         <li><a href="/#menus">Boxed Meals</a></li>
         <li><a href="/#testimonials">Testimonials</a></li>
         <li><a href="/booking/" class="active">Order Now</a></li>
+        <li><a href="/lunch-sale/">Lunch Sale</a></li>
         <li><a href="/contact/">Contact</a></li>
       </ul>
     </nav>
@@ -53,7 +54,7 @@
     <div class="section-head">
       <p class="eyebrow">Step 1 of 2</p>
       <h2>Check Availability &amp; Request a Delivery Date</h2>
-      <p>Pick an open date on the calendar, then tell us about your order. Every request is reviewed before it's confirmed — once approved, you'll get a secure link to pay your deposit and lock it in.</p>
+      <p>Pick an open date on the calendar, build your order from the menu below, then submit your details. Every request is reviewed before it's confirmed — once approved, you'll get a secure link to pay your deposit and lock it in.</p>
     </div>
 
     <div class="calendar" id="calendar">
@@ -75,6 +76,24 @@
         <label for="event_date">Selected delivery date</label>
         <input type="text" id="event_date" name="event_date" placeholder="Pick a date on the calendar above" readonly required>
       </div>
+
+      <div class="field">
+        <label>Which menu?</label>
+        <div class="tabs" id="menuTabs">
+          <button type="button" class="tab-btn active" data-menu="boxed_lunch">Boxed Lunch</button>
+          <button type="button" class="tab-btn" data-menu="charcuterie">Charcuterie Board</button>
+          <button type="button" class="tab-btn" data-menu="custom_meal">Custom Boxed Meal</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="guest_count">Number of boxes / guests</label>
+        <input type="number" id="guest_count" name="guest_count" min="1" value="1" required>
+      </div>
+
+      <div id="menuPanels"><p style="color:var(--muted);">Loading menu…</p></div>
+
+      <div class="order-summary" id="orderSummary" style="display:none;"></div>
 
       <div class="field-row">
         <div class="field">
@@ -103,17 +122,6 @@
         </div>
       </div>
 
-      <div class="field-row">
-        <div class="field">
-          <label for="guest_count">Number of boxes</label>
-          <input type="number" id="guest_count" name="guest_count" min="1" required>
-        </div>
-        <div class="field">
-          <label for="budget">Approximate budget</label>
-          <input type="text" id="budget" name="budget" placeholder="e.g. $500–$1,000">
-        </div>
-      </div>
-
       <div class="field">
         <label for="location">Delivery or pickup location</label>
         <input type="text" id="location" name="location" placeholder="Address or venue name">
@@ -134,13 +142,14 @@
 <footer class="site-footer">
   <div class="wrap">
     <div class="footer-bottom">
-      © <span id="year"></span> Boxed Indulgence. Mockup site.
+      © <span id="year"></span> Boxed Indulgence.
       <span class="footer-credit">Built by <a href="https://structurecollective.com" target="_blank" rel="noopener"><img src="/img/sc-logo.png" alt="" class="sc-logo">Structure Collective</a></span>
     </div>
   </div>
 </footer>
 
 <script src="/js/main.js"></script>
+<script src="/js/menu-selector.js"></script>
 <script src="/js/mock-db.js"></script>
 <script src="/js/booking.js"></script>
 </body>

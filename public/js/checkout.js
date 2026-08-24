@@ -9,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
   currentBooking = id ? MockDB.getBooking(id) : null;
 
   const summary = document.getElementById("summaryText");
-  const form = document.getElementById("checkoutForm");
+  const payCard = document.getElementById("payCard");
   const notFound = document.getElementById("notFoundCard");
 
   if (!currentBooking || currentBooking.status !== "approved") {
@@ -18,16 +18,21 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-  const amount = ((currentBooking.deposit_amount_cents || 0) / 100).toFixed(2);
-  summary.textContent = `${currentBooking.name}, pay your $${amount} deposit to lock in your order for ${formatDate(
+  summary.textContent = `${currentBooking.name}, review your order below and pay your deposit to lock in ${formatDate(
     currentBooking.event_date
-  )} (${currentBooking.guest_count} boxes).`;
-  form.style.display = "block";
-  form.addEventListener("submit", onPay);
+  )}.`;
+
+  document.getElementById("orderSummary").innerHTML = `
+    <div class="line">Order total<span>$${((currentBooking.order_total_cents || 0) / 100).toFixed(2)}</span></div>
+    <div class="total">Deposit due now (${currentBooking.deposit_percent || 50}%)<span>$${(
+      (currentBooking.deposit_amount_cents || 0) / 100
+    ).toFixed(2)}</span></div>`;
+
+  payCard.style.display = "block";
+  document.getElementById("payBtn").addEventListener("click", onPay);
 });
 
-function onPay(e) {
-  e.preventDefault();
+function onPay() {
   const btn = document.getElementById("payBtn");
   btn.disabled = true;
   btn.textContent = "Processing…";
