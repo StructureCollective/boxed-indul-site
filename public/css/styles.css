@@ -414,16 +414,6 @@ section.dark p { color: #c9c0ac; }
 .footer-credit a { display: inline-flex; align-items: center; gap: 6px; }
 .footer-credit .sc-logo { width: 16px; height: 16px; display: inline-block; }
 
-/* ---- badges / misc ---- */
-.mock-banner {
-  background: var(--black);
-  color: var(--cream);
-  text-align: center;
-  font-size: 0.8rem;
-  padding: 8px 16px;
-}
-.mock-banner strong { color: var(--gold-light); }
-
 /* ============================================================
    Order form — menu selection cards + running total
    ============================================================ */

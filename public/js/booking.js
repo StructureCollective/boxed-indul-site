@@ -1,5 +1,4 @@
-// Availability calendar + itemized-menu booking request form (sandbox
-// preview version — writes to MockDB/localStorage instead of a real API).
+// Availability calendar + itemized-menu booking request form (live/API version).
 
 const state = {
   viewYear: null,
@@ -28,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("bookingForm");
   form.addEventListener("submit", onSubmit);
 
+  // Handle redirect back from Stripe checkout (paid=1 / canceled=1)
   const params = new URLSearchParams(window.location.search);
   const msgEl = document.getElementById("formMsg");
   if (params.get("paid") === "1") {
@@ -52,7 +52,14 @@ async function loadMonth() {
     1
   ).toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
-  state.unavailable = new Set(MockDB.unavailableDatesInMonth(monthStr));
+  try {
+    const res = await fetch(`/api/availability?month=${monthStr}`);
+    const data = await res.json();
+    state.unavailable = new Set(data.unavailable || []);
+  } catch (err) {
+    console.error("Failed to load availability", err);
+    state.unavailable = new Set();
+  }
   renderCalendar();
 }
 
@@ -121,9 +128,10 @@ function formatDateNice(dateStr) {
   return d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }
 
-function onSubmit(e) {
+async function onSubmit(e) {
   e.preventDefault();
   const msgEl = document.getElementById("formMsg");
+  const submitBtn = document.getElementById("submitBtn");
   const rawDate = document.getElementById("event_date").dataset.raw;
 
   if (!rawDate) {
@@ -135,11 +143,7 @@ function onSubmit(e) {
     return;
   }
 
-  const { total, hasQuoted } = MenuSelector.computeTotal();
-  const depositPercent = 50;
-
-  const booking = {
-    id: MockDB.newId(),
+  const payload = {
     ...MenuSelector.getSelection(),
     name: document.getElementById("name").value.trim(),
     email: document.getElementById("email").value.trim(),
@@ -149,28 +153,44 @@ function onSubmit(e) {
     guest_count: Number(document.getElementById("guest_count").value),
     location: document.getElementById("location").value.trim(),
     notes: document.getElementById("notes").value.trim(),
-    order_total_cents: total,
-    deposit_percent: depositPercent,
-    deposit_amount_cents: Math.round((total * depositPercent) / 100) || 5000,
-    status: "pending_approval",
-    created_at: MockDB.nowIso(),
-    updated_at: MockDB.nowIso(),
   };
 
-  MockDB.addBooking(booking);
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Sending…";
 
-  showMsg(
-    msgEl,
-    "success",
-    hasQuoted
-      ? "Request sent! Because your order includes custom/quoted items, we'd follow up with final pricing before sending your deposit link."
-      : "Request sent! We'll review it and follow up by email — usually within 1–2 business days."
-  );
-  document.getElementById("bookingForm").reset();
-  document.getElementById("event_date").dataset.raw = "";
-  state.selectedDate = null;
-  document.getElementById("submitBtn").textContent = "Request Sent";
-  loadMonth();
+  try {
+    const res = await fetch("/api/booking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showMsg(msgEl, "error", data.error || "Something went wrong — please try again.");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Request This Date";
+      return;
+    }
+
+    showMsg(
+      msgEl,
+      "success",
+      data.has_quoted_items
+        ? "Request sent! Because your order includes custom/quoted items, we'll follow up by email with final pricing before sending your deposit link."
+        : "Request sent! We'll review it and follow up by email — usually within 1–2 business days."
+    );
+    document.getElementById("bookingForm").reset();
+    document.getElementById("event_date").dataset.raw = "";
+    state.selectedDate = null;
+    submitBtn.textContent = "Request Sent";
+    await loadMonth();
+  } catch (err) {
+    console.error(err);
+    showMsg(msgEl, "error", "Network error — please try again.");
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Request This Date";
+  }
 }
 
 function showMsg(el, type, text) {

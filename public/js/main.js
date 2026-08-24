@@ -19,7 +19,81 @@ document.addEventListener("DOMContentLoaded", () => {
   if (document.getElementById("promoGrid")) {
     loadContent();
   }
+  if (document.getElementById("lunchSaleContent")) {
+    loadLunchSale();
+  }
 });
+
+async function loadLunchSale() {
+  const el = document.getElementById("lunchSaleContent");
+  try {
+    const res = await fetch("/api/lunch-sale/current");
+    const data = await res.json();
+    renderLunchSale(el, data.event);
+  } catch (err) {
+    console.error("Failed to load lunch sale", err);
+    renderLunchSale(el, null);
+  }
+}
+
+function renderLunchSale(el, event) {
+  if (!event) {
+    el.innerHTML = `
+      <div class="lunch-none-card">
+        <p style="margin:0 0 12px;font-weight:600;color:var(--black);">No upcoming sale at this time.</p>
+        <p style="margin:0 0 20px;">Want to hear about the next one? Sign up to get notified when a new lunch sale drops.</p>
+        <a href="/lunch-sale/" class="btn btn-outline">Get Notified</a>
+      </div>`;
+    return;
+  }
+
+  const remaining = event.slots_remaining ?? Math.max(0, event.slot_cap - (event.slots_used || 0));
+  const low = remaining <= Math.max(1, Math.round(event.slot_cap * 0.2));
+  const dropoffs = safeParseDropoffs(event.dropoff_options);
+
+  el.innerHTML = `
+    <div class="lunch-card">
+      <span class="slots-left${low ? " low" : ""}">${remaining} order${remaining === 1 ? "" : "s"} left</span>
+      <h3 style="margin-bottom:6px;">${escapeHtml(event.title)}</h3>
+      <p style="margin-bottom:14px;">${escapeHtml(event.menu_description)}</p>
+      <p style="margin-bottom:6px;font-size:0.9rem;"><strong>For:</strong> ${formatDate(event.sale_date)}</p>
+      <p style="margin-bottom:6px;font-size:0.9rem;"><strong>Price:</strong> $${(event.price_cents / 100).toFixed(2)} per lunch</p>
+      <p style="margin-bottom:6px;font-size:0.9rem;"><strong>Order by:</strong> ${formatDateTime(event.order_cutoff_at)}</p>
+      ${
+        dropoffs.length
+          ? `<p style="margin-bottom:18px;font-size:0.9rem;"><strong>Drop-off:</strong> ${dropoffs
+              .map((d) => escapeHtml(`${d.time} — ${d.location}`))
+              .join(" · ")}</p>`
+          : ""
+      }
+      <a href="/lunch-sale/" class="btn btn-primary">Order Now</a>
+    </div>`;
+}
+
+function safeParseDropoffs(raw) {
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(raw || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function formatDateTime(s) {
+  try {
+    const d = new Date(s);
+    return d.toLocaleString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  } catch {
+    return s;
+  }
+}
 
 async function loadContent() {
   try {

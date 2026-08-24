@@ -1,9 +1,8 @@
 // Shared menu-selection UI for /booking/ — renders the Boxed Lunch /
 // Charcuterie / Custom Meal tabs + option cards from /data/content.json's
 // `orderMenus`, tracks the customer's picks, and computes a running total.
-// Used by both the sandbox (public/js/booking.js) and live
-// (going-live-reference/booking.live.js) booking scripts, so pricing logic
-// only needs editing in one place (content.json) and one renderer.
+// Shared by public/js/booking.js so pricing logic only needs editing in one
+// place (content.json) and one renderer.
 //
 // The computed total here is a courtesy preview only — the server always
 // recomputes it from content.json itself before charging anything.

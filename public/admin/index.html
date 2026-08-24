@@ -10,24 +10,45 @@
 <link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
 <link rel="stylesheet" href="/css/styles.css">
 <style>
-  .admin-wrap { max-width: 780px; margin: 60px auto; padding: 0 24px; }
-  .lock-card { max-width: 380px; margin: 100px auto; background: var(--ink-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 32px; text-align: center; }
-  .booking-row { background: var(--ink-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 24px; margin-bottom: 16px; }
-  .booking-row .top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
-  .booking-row .top strong { font-size: 1.05rem; }
-  .booking-row dl { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; font-size: 0.88rem; margin: 12px 0; }
-  .booking-row dt { color: var(--muted); }
-  .booking-row dd { margin: 0; }
-  .booking-row .actions { display: flex; gap: 10px; margin-top: 14px; }
-  .booking-row .actions .btn { padding: 10px 20px; font-size: 0.78rem; }
-  .admin-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
-  .admin-section { margin-top: 44px; }
-  .admin-section .section-head { text-align: left; margin-bottom: 16px; }
+  .admin-wrap { max-width: 980px; margin: 40px auto 80px; padding: 0 24px; }
+  .admin-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 10px; }
+  .admin-topbar a.back { font-size: 0.82rem; color: var(--muted); text-decoration: none; }
+  .admin-topbar a.back:hover { color: var(--rust); }
+  .admin-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; border-bottom: 1px solid var(--line); }
+  .admin-tabs button {
+    background: none; border: none; padding: 10px 4px; margin-right: 20px; font-family: var(--font-body);
+    font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; font-size: 0.78rem; color: var(--muted);
+    cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .admin-tabs button.active { color: var(--rust-dark); border-bottom-color: var(--rust); }
+  .admin-panel { display: none; }
+  .admin-panel.active { display: block; }
+  .admin-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+  .admin-card { background: var(--ink-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; }
+  .admin-card h3 { margin-bottom: 14px; }
+  .subtle { color: var(--muted); font-size: 0.85rem; }
+  .dropoff-rows .dropoff-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .dropoff-rows input { flex: 1; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; font-family: var(--font-body); }
+  .dropoff-rows button { flex-shrink: 0; }
+  .event-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 14px; }
+  .event-card .top { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .event-card .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .event-card .actions .btn { padding: 8px 16px; font-size: 0.72rem; }
+  .status-live { background: rgba(85,96,63,0.22); color: var(--green-dark); }
+  .status-draft { background: rgba(20,18,13,0.08); color: var(--muted); }
+  .status-closed { background: rgba(20,18,13,0.08); color: var(--muted); }
+  .status-canceled { background: rgba(122,46,46,0.14); color: var(--maroon); }
+  .status-paid { background: rgba(85,96,63,0.22); color: var(--green-dark); }
+  .status-pending_payment { background: rgba(182,134,47,0.14); color: var(--rust-dark); }
+  .cal-status-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .cal-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: var(--maroon); }
+  .cal-dot.connected { background: var(--green); }
+  .blocked-list { list-style: none; margin: 0; padding: 0; }
+  .blocked-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 0.88rem; }
+  .blocked-list li:last-child { border-bottom: none; }
 </style>
 </head>
 <body>
-
-<div class="mock-banner">Sandbox admin view — data lives only in this browser's storage. Passcode is <strong>preview</strong> (change it in <code>/js/admin.js</code>).</div>
 
 <header class="site-header">
   <div class="wrap">
@@ -38,46 +59,186 @@
   </div>
 </header>
 
-<div id="lockScreen" class="lock-card">
-  <h3 style="margin-bottom:16px;">Admin Access</h3>
-  <div class="field" style="text-align:left;">
-    <label for="adminKey">Passcode</label>
-    <input type="password" id="adminKey" placeholder="Enter admin passcode">
+<div class="admin-wrap">
+  <div class="admin-topbar">
+    <div>
+      <p class="eyebrow" style="margin-bottom:2px;">Admin</p>
+      <h2 style="margin-bottom:0;">Dashboard</h2>
+    </div>
+    <a class="back" href="/">← Back to site</a>
   </div>
-  <button class="btn btn-primary" id="unlockBtn" style="width:100%;justify-content:center;margin-top:8px;">Unlock</button>
-  <p class="form-note" id="lockMsg"></p>
+
+  <div id="globalMsg" class="form-msg" style="margin-bottom:20px;"></div>
+
+  <div class="admin-tabs">
+    <button class="tab-btn active" data-panel="panel-bookings">Custom Orders</button>
+    <button class="tab-btn" data-panel="panel-lunch">Lunch Sale</button>
+    <button class="tab-btn" data-panel="panel-contacts">Contacts</button>
+    <button class="tab-btn" data-panel="panel-calendar">Calendar &amp; Dates</button>
+  </div>
+
+  <!-- ===================== Custom Orders (bookings) ===================== -->
+  <section class="admin-panel active" id="panel-bookings">
+    <div class="admin-toolbar">
+      <div class="admin-search"><input type="text" id="bookingsSearch" placeholder="Search name, email, date…"></div>
+      <button class="btn btn-outline" id="bookingsRefresh">Refresh</button>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" id="bookingsTable">
+        <thead>
+          <tr>
+            <th>Name</th><th>Date</th><th>Occasion</th><th>Boxes</th><th>Total</th><th>Deposit</th><th>Status</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="bookingsBody"><tr><td colspan="8" class="subtle">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== Lunch Sale ===================== -->
+  <section class="admin-panel" id="panel-lunch">
+    <div class="admin-card">
+      <h3>New Lunch Sale Event</h3>
+      <form id="lunchEventForm">
+        <div class="field">
+          <label for="ev_title">Title</label>
+          <input type="text" id="ev_title" required placeholder="e.g. Friday Lunch Drop — Oct 3">
+        </div>
+        <div class="field">
+          <label for="ev_menu">Menu description</label>
+          <textarea id="ev_menu" rows="3" required placeholder="What's in the lunch this round"></textarea>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="ev_price">Price per lunch ($)</label>
+            <input type="number" id="ev_price" min="0" step="0.01" required>
+          </div>
+          <div class="field">
+            <label for="ev_sale_date">Sale date</label>
+            <input type="date" id="ev_sale_date" required>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="ev_cutoff">Order cutoff (date &amp; time)</label>
+            <input type="datetime-local" id="ev_cutoff" required>
+          </div>
+          <div class="field">
+            <label for="ev_slot_cap">Slot cap (max orders)</label>
+            <input type="number" id="ev_slot_cap" min="1" value="20" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="ev_max_qty">Max quantity per order</label>
+          <input type="number" id="ev_max_qty" min="1" value="10">
+        </div>
+        <div class="field">
+          <label>Drop-off time(s) &amp; location(s)</label>
+          <div class="dropoff-rows" id="dropoffRows"></div>
+          <button type="button" class="btn btn-outline" id="addDropoff" style="margin-top:6px;padding:8px 16px;font-size:0.75rem;">+ Add drop-off</button>
+        </div>
+        <div class="field">
+          <label for="ev_status">Status</label>
+          <select id="ev_status">
+            <option value="draft">Draft (not visible to customers)</option>
+            <option value="live">Live (visible on homepage now)</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary" id="ev_submit" style="width:100%;justify-content:center;">Create Event</button>
+        <div class="form-msg" id="lunchEventMsg"></div>
+      </form>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-toolbar" style="margin-bottom:14px;">
+        <h3 style="margin:0;">Events</h3>
+        <button class="btn btn-outline" id="eventsRefresh">Refresh</button>
+      </div>
+      <div id="eventsList"><p class="subtle">Loading…</p></div>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-toolbar">
+        <div class="admin-search"><input type="text" id="ordersSearch" placeholder="Search name, email, event…"></div>
+        <h3 style="margin:0;">Orders</h3>
+        <button class="btn btn-outline" id="ordersRefresh">Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="ordersTable">
+          <thead>
+            <tr><th>Event</th><th>Name</th><th>Email</th><th>Qty</th><th>Drop-off</th><th>Total</th><th>Status</th></tr>
+          </thead>
+          <tbody id="ordersBody"><tr><td colspan="7" class="subtle">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-toolbar">
+        <h3 style="margin:0;">Notify-Me Signups</h3>
+        <button class="btn btn-outline" id="signupsRefresh">Refresh</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="signupsTable">
+          <thead><tr><th>Email</th><th>Signed Up</th></tr></thead>
+          <tbody id="signupsBody"><tr><td colspan="2" class="subtle">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Contacts ===================== -->
+  <section class="admin-panel" id="panel-contacts">
+    <div class="admin-toolbar">
+      <div class="admin-search"><input type="text" id="contactsSearch" placeholder="Search name, email, message…"></div>
+      <button class="btn btn-outline" id="contactsRefresh">Refresh</button>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table" id="contactsTable">
+        <thead>
+          <tr><th>Name</th><th>Email</th><th>Phone</th><th>Date</th><th>Message</th></tr>
+        </thead>
+        <tbody id="contactsBody"><tr><td colspan="5" class="subtle">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===================== Calendar & Blocked Dates ===================== -->
+  <section class="admin-panel" id="panel-calendar">
+    <div class="admin-card">
+      <h3>Google Calendar</h3>
+      <div class="cal-status-row" id="calStatusRow">
+        <span class="cal-dot" id="calDot"></span>
+        <span id="calStatusText" class="subtle">Checking connection…</span>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+        <a class="btn btn-primary" href="/api/admin/google/connect" id="calConnectBtn">Connect Google Calendar</a>
+        <button class="btn btn-outline" id="calSyncBtn" style="display:none;">Sync Now</button>
+        <button class="btn btn-outline" id="calDisconnectBtn" style="display:none;border-color:var(--maroon);color:var(--maroon);">Disconnect</button>
+      </div>
+      <p class="subtle" style="margin-top:14px;">Once connected, confirmed bookings push to this calendar automatically, and busy times pull back in daily (and on demand with Sync Now) to block new requests.</p>
+    </div>
+
+    <div class="admin-card">
+      <h3>Blocked Dates</h3>
+      <form id="blockedForm" class="field-row" style="align-items:flex-end;">
+        <div class="field" style="flex:1;">
+          <label for="blockDate">Date</label>
+          <input type="date" id="blockDate" required>
+        </div>
+        <div class="field" style="flex:2;">
+          <label for="blockReason">Reason (optional)</label>
+          <input type="text" id="blockReason" placeholder="e.g. Day off">
+        </div>
+        <div class="field" style="flex:0 0 auto;">
+          <button type="submit" class="btn btn-primary">Block Date</button>
+        </div>
+      </form>
+      <ul class="blocked-list" id="blockedList"></ul>
+    </div>
+  </section>
 </div>
 
-<div class="admin-wrap" id="adminPanel" style="display:none;">
-  <div class="section-head" style="text-align:left;margin-bottom:8px;">
-    <p class="eyebrow">Pending Requests</p>
-    <h2 style="margin-bottom:6px;">Order Approvals</h2>
-    <p>Approve to generate a deposit link (simulated — no real charge), or reject to release the date.</p>
-  </div>
-  <div class="admin-toolbar">
-    <button class="btn btn-outline" id="refreshBtn">Refresh</button>
-    <button class="btn btn-outline" id="resetBtn" style="border-color:var(--maroon);color:var(--maroon);">Reset All Sandbox Data</button>
-  </div>
-  <div id="pendingList"></div>
-
-  <div class="admin-section" id="approvedSection">
-    <div class="section-head">
-      <p class="eyebrow">Awaiting Deposit</p>
-      <h2 style="margin-bottom:6px;">Approved</h2>
-    </div>
-    <div id="approvedList"></div>
-  </div>
-
-  <div class="admin-section" id="confirmedSection">
-    <div class="section-head">
-      <p class="eyebrow">Locked In</p>
-      <h2 style="margin-bottom:6px;">Confirmed</h2>
-    </div>
-    <div id="confirmedList"></div>
-  </div>
-</div>
-
-<script src="/js/mock-db.js"></script>
 <script src="/js/admin.js"></script>
 </body>
 </html>

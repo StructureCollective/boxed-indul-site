@@ -1,191 +1,207 @@
-# Boxed Indulgence — indulgent boxed catered meals site (sandbox preview)
+# Boxed Indulgence — indulgent boxed catered meals site
 
-A working mockup of an upscale boxed catered meal ordering website: Home, Order
-(availability calendar + approval-gated deposit), Contact, and an Admin
-approval page — currently running as a **fully client-side sandbox** so it
-deploys with zero Cloudflare setup.
+The full, live backend is wired in: Cloudflare Workers + D1 for storage,
+Stripe for deposit and lunch-sale payments, Resend for transactional email,
+Cloudflare Access (Zero Trust) for admin sign-in, and two-way Google Calendar
+sync for availability. Nothing runs in a browser-only "sandbox" anymore —
+every page talks to the real Worker API in `src/`.
 
-## Current mode: sandbox (no setup required)
+**The site will not fully work yet on a fresh deploy** until the one-time
+Cloudflare setup below is completed (D1 database, Access application,
+secrets). Until then, `/booking/`, `/lunch-sale/`, `/contact/`, and `/admin/`
+will return errors when they call the API. Complete the checklist below
+*before* pushing/deploying these changes to the live site, or right after —
+just know the ordering, admin panel, and lunch sale pages won't function
+until it's done.
 
-Everything — the availability calendar, order requests, contact messages,
-admin approve/reject, and the deposit "payment" — runs entirely in the
-browser using `localStorage` as a stand-in database. See
-`public/js/mock-db.js`. There is no server, no database, no Stripe account,
-and no email service involved. That means:
+## Go-live checklist
 
-- **Nothing to configure.** `wrangler.jsonc` just points at the `public/`
-  folder as static assets — deploy it as-is, from GitHub or `wrangler deploy`.
-- **Data is per-browser.** An order submitted on your laptop won't show up
-  if you open the admin page on your phone, and clearing browser data wipes
-  it. That's expected for a preview — it's not meant to hold real orders.
-- **The deposit page is simulated.** `/booking/checkout/` looks like a
-  payment form but doesn't process anything — any input works, submitting it
-  just marks the order "confirmed" in the browser's storage.
-- **The admin passcode (`preview`, in `public/js/admin.js`) is not real
-  security.** It's a soft gate for a demo, not authentication — anyone who
-  views page source can see it.
+Do these in order. None of them require writing code — all dashboard or
+one-line CLI steps.
 
-To try the full loop: submit a request on `/booking/`, then open `/admin/`
-(passcode `preview`) to approve it, then use the "Open Deposit Page" link
-that appears to simulate the customer paying. There's a "Reset All Sandbox
-Data" button on the admin page if you want to clear everything between demos.
+### 1. Create the D1 database
 
-### Accessing the admin page
+**Dashboard (no CLI needed):** Cloudflare dashboard → Storage & Databases →
+D1 SQL Database → Create database → name it `boxed-indulgence-db`. Open its
+**Console** tab, paste in the contents of `schema.sql` from this repo, and
+run it. Copy the **Database ID** shown on the database's overview page.
 
-Go to `/admin/` on the deployed site (e.g. `https://your-site-url.com/admin/`
-— or `http://localhost:8000/admin/` if you're previewing it locally). Enter
-the passcode **`preview`** to unlock it. It's a link only — there's no
-button for it anywhere on the public pages, by design, so customers don't
-stumble onto it. Bookmark the URL once you know it. Remember this passcode
-is a soft demo gate, not real security (see above) — swap it for something
-private before sharing the site link with anyone outside your team, and
-replace it entirely with real authentication before going live.
+**Or via CLI**, from a machine with `wrangler` installed and network access:
+```
+npx wrangler login
+npx wrangler d1 create boxed-indulgence-db
+npm run db:init:remote
+```
 
-## Going live later
+Either way, paste the resulting `database_id` into `wrangler.jsonc` under
+`d1_databases[0].database_id`, replacing `REPLACE_WITH_YOUR_D1_DATABASE_ID`.
 
-The real backend — Cloudflare D1 for storage, Stripe (test or live mode) for
-actual deposit payments, and Resend for real email notifications — is
-already fully built. It's just not wired in right now. It lives in:
+### 2. Set up Cloudflare Access (Zero Trust) for `/admin/*`
 
-- `src/` — the Worker (routes, D1 queries, Stripe REST calls, email
-  templates). Untouched, ready to go.
-- `going-live-reference/` — the original fetch-based `booking.js`,
-  `contact.js`, `admin.js`, and a `wrangler.live.jsonc` with the D1 binding
-  and vars restored.
+This is what replaces the old admin passcode with a real sign-in — only the
+two approved emails will be able to reach `/admin/`.
 
-To switch from sandbox to live:
+1. Cloudflare dashboard → **Zero Trust** (left sidebar). First time in,
+   it'll ask you to pick a **team name** — this becomes your team domain,
+   `<team-name>.cloudflareaccess.com`. (Zero Trust has a free plan for up to
+   50 users, which easily covers 2 admins.)
+2. Zero Trust → **Access** → **Applications** → **Add an application** →
+   **Self-hosted**.
+3. Application configuration:
+   - **Application name**: `Boxed Indulgence Admin`
+   - **Session duration**: whatever you're comfortable with (24h is a
+     reasonable default).
+   - **Application domain**: `boxedindulgence.com`, path `/admin`. (This
+     protects everything under `/admin/*`, including `/api/admin/*` since
+     that's proxied through the same Worker.)
+4. **Add a policy**:
+   - **Policy name**: `Admins`
+   - **Action**: Allow
+   - **Include** rule: **Emails** — add both
+     `boxedindulgenceadmin@gmail.com` and `admin@structurecollective.com`.
+5. Save. Cloudflare will now show a login page (email + one-time PIN, unless
+   you also set up Google/other identity providers) to anyone visiting
+   `/admin/*` who isn't one of those two emails.
+6. Open the application you just created and go to its **Overview** tab.
+   Copy the **Application Audience (AUD) Tag** shown there.
+7. Fill these into `wrangler.jsonc` under `vars`:
+   - `CF_ACCESS_TEAM_DOMAIN` → `<your-team-name>.cloudflareaccess.com`
+   - `CF_ACCESS_AUD` → the AUD tag from step 6
 
-1. Copy `going-live-reference/wrangler.live.jsonc` over `wrangler.jsonc`
-   (or merge the `main`, `d1_databases`, and `vars` blocks back in).
-2. Copy the three `*.live.js` files from `going-live-reference/` over the
-   sandbox versions in `public/js/` (renaming them back to `booking.js`,
-   `contact.js`, `admin.js`), and remove the `mock-db.js` `<script>` tags
-   from `public/booking/index.html`, `public/contact/index.html`, and
-   `public/admin/index.html` (no longer needed).
-3. Create a D1 database and apply `schema.sql`, get a free Stripe test-mode
-   key, get a Resend API key, and pick a real `ADMIN_KEY` — set these up
-   following the steps below.
-4. Delete `public/booking/checkout/` (the simulated payment page) — the
-   live flow uses real Stripe Checkout instead, hosted by Stripe.
+The Worker verifies the Access session server-side too (see
+`src/lib/access.js`), so `/api/admin/*` can't be called directly even if
+someone bypasses the Access login page somehow.
 
-### One-time setup for the live backend
+### 3. Set the remaining secrets
 
-1. **Install dependencies**
-   ```
-   npm install
-   ```
+From the Cloudflare dashboard (Worker → Settings → Variables and Secrets) or
+CLI:
+```
+npx wrangler secret put STRIPE_SECRET_KEY       # sk_test_... or sk_live_...
+npx wrangler secret put STRIPE_WEBHOOK_SECRET    # whsec_...
+npx wrangler secret put RESEND_API_KEY           # from resend.com
+npx wrangler secret put GOOGLE_CLIENT_SECRET     # from Google Cloud Console OAuth client
+```
+There's no `ADMIN_KEY` anymore — Cloudflare Access replaced it entirely.
 
-2. **Log in to Cloudflare**
-   ```
-   npx wrangler login
-   ```
+### 4. Set up the Stripe webhook
 
-3. **Create the D1 database**
-   ```
-   npx wrangler d1 create boxed-indulgence-db
-   ```
-   Copy the `database_id` it prints into `wrangler.jsonc` under
-   `d1_databases[0].database_id`. (Can also be done with zero CLI use, from
-   the Cloudflare dashboard — Storage & Databases → D1 SQL Database → Create
-   database — then paste the ID and run `schema.sql` from the database's
-   Console tab.)
+Stripe dashboard → Developers → Webhooks → Add endpoint →
+`https://boxedindulgence.com/api/stripe/webhook`, listening for
+`checkout.session.completed`. Copy the signing secret into
+`STRIPE_WEBHOOK_SECRET` (step 3).
 
-4. **Apply the schema** (if using the CLI)
-   ```
-   npm run db:init:remote
-   ```
+### 5. Connect Google Calendar
 
-5. **Fill in `wrangler.jsonc` vars**
-   - `CLIENT_NOTIFY_EMAIL` — where order/contact notifications go.
-   - `FROM_EMAIL` — the address emails are sent *from*, on a domain verified
-     in Resend.
-   - `SITE_URL` — the site's real deployed URL.
+Once the site is live and you can reach `/admin/`, open the **Calendar &
+Dates** tab and click **Connect Google Calendar** — this runs the OAuth flow
+and stores a refresh token in D1. After that, confirmed bookings push to the
+calendar automatically, and busy times pull back in daily (and on demand via
+**Sync Now**).
 
-6. **Set secrets** (from the Cloudflare dashboard — Worker → Settings →
-   Variables and Secrets — or via CLI):
-   ```
-   npx wrangler secret put STRIPE_SECRET_KEY       # sk_test_... or sk_live_...
-   npx wrangler secret put STRIPE_WEBHOOK_SECRET    # whsec_...
-   npx wrangler secret put RESEND_API_KEY           # from resend.com
-   npx wrangler secret put ADMIN_KEY                # a real passphrase
-   ```
+### 6. Confirm menu prices
 
-7. **Set up the Stripe webhook**: Stripe dashboard → Developers → Webhooks →
-   Add endpoint → `https://<your-worker-url>/api/stripe/webhook`, listening
-   for `checkout.session.completed`. Copy the signing secret into
-   `STRIPE_WEBHOOK_SECRET`.
+`public/data/content.json` → `orderMenus` currently has **placeholder
+prices** carried over from the uploaded templates. Edit those to real prices
+before taking real orders — see the `_orderMenus_instructions` note in that
+file.
 
-## Deploying from GitHub
+## Architecture
 
-Two options:
+- `src/index.js` — the Worker: routes `/api/*`, verifies the Cloudflare
+  Access session for `/api/admin/*`, falls back to the `ASSETS` binding
+  (the `public/` folder) for everything else, and runs a daily cron
+  (`scheduled()`) to pull busy dates from Google Calendar.
+- `src/lib/` — D1 queries (`db.js`), Stripe REST calls (`stripe.js`), Resend
+  email templates (`email.js`), Cloudflare Access JWT verification
+  (`access.js`), Google Calendar OAuth + sync (`calendar.js`), server-side
+  menu pricing (`menu-data.js`, reads `public/data/content.json` so prices
+  are edited in one place and both the form and the Worker agree).
+- `public/` — the static site. `public/js/*.js` are the live frontend
+  scripts (no more sandbox/live split — `mock-db.js` is gone).
+- `schema.sql` — the D1 schema: `bookings`, `blocked_dates`,
+  `contact_messages`, `lunch_sale_events`, `lunch_sale_orders`,
+  `lunch_sale_signups`, `google_calendar_connection`.
+- `going-live-reference/` — now just a historical snapshot of the frontend
+  scripts and `wrangler.jsonc` from when the site ran in sandbox mode. It's
+  no longer needed for anything and can be deleted whenever you like.
 
-**Option A — GitHub Actions (included, `.github/workflows/deploy.yml`)**
-Deploys on every push to `main`. Requires two repo secrets: `CLOUDFLARE_API_TOKEN`
-and `CLOUDFLARE_ACCOUNT_ID`.
+### Custom-order flow (Boxed Lunch / Charcuterie / Custom Boxed Meal)
 
-**Option B — Cloudflare Workers Builds**
-Dashboard → Workers & Pages → your worker → Settings → Builds → connected to
-GitHub. Deploys automatically on push, no Actions needed. If using this,
-you can delete `.github/workflows/deploy.yml`. Make sure the Worker's name
-in the Cloudflare dashboard matches `wrangler.jsonc`'s `"name"` field
-(currently `boxed-indul-site`) — if Cloudflare Workers Builds auto-created a
-worker with a different name, either rename it there or update
-`wrangler.jsonc` to match.
+`/booking/` → customer picks a date, builds an itemized order from
+`content.json`'s `orderMenus`, submits → email to admin + confirmation email
+to customer → admin approves (optionally overriding the total for
+quoted/custom items) on `/admin/` → time-limited (72h, configurable via
+`DEPOSIT_LINK_EXPIRY_HOURS`) deposit link emailed to the customer →
+`/booking/checkout/` creates a fresh Stripe Checkout Session only at the
+moment the customer clicks Pay → webhook confirms the booking, pushes it to
+Google Calendar, and emails both sides.
+
+### Lunch Sale flow
+
+Admin posts a lunch-sale event from `/admin/` → **Lunch Sale** tab (menu,
+price, drop-off time(s)/location(s), sale date, order cutoff, slot cap, max
+qty per order) and sets it **Live**. It then shows on the homepage and at
+`/lunch-sale/` with a live slots-remaining count. Customers order (quantity +
+drop-off choice), pay in full at Stripe Checkout, and the order lands in the
+searchable **Orders** table on `/admin/`. When no sale is live, the homepage
+shows a placeholder and `/lunch-sale/` offers an email signup — admins can
+notify everyone on that list with one click once a new sale goes live.
 
 ## Editing seasonal content
 
-The "Current Promotions," "Boxed Meal Collections," and "Testimonials"
-sections come from `public/data/content.json`. Edit the JSON, then redeploy
-— no code changes needed for routine updates. This works the same in
-sandbox or live mode.
+The "Current Promotions," "Boxed Meal Collections," "Order form pricing,"
+and "Testimonials" all come from `public/data/content.json`. Edit the JSON,
+redeploy — no code changes needed.
 
 ## Brand assets
 
-Every image on the site is a real supplied brand asset — there are no
-generated placeholder photos:
+Every image on the site is a real supplied brand asset:
 
-- `public/img/logo.png` — full circular logo, used in the header and
-  admin page.
-- `public/img/wordmark.png` — transparent wordmark lockup, available if a
-  page ever needs the text-only version (not currently placed).
-- `public/img/hero-bg.jpg` — the real product photo, used as the homepage
-  hero background.
-- `public/img/chef.png` — the curator illustration, used in the "Meet Your
-  Curator" section on the homepage.
+- `public/img/logo.png` — full circular logo, used in the header and admin
+  page.
+- `public/img/wordmark.png` — transparent wordmark lockup.
+- `public/img/hero-bg.jpg` — the homepage hero background photo.
+- `public/img/chef.png` — the curator illustration.
 - `public/img/favicon.ico`, `favicon-16.png`, `favicon-32.png`,
   `favicon-48.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` —
-  the browser tab / bookmark / home-screen icon, cropped from the product
-  photo (the box + gold bow). Linked from every page's `<head>`.
-- `public/img/og-image.jpg` — the social share preview image (1200×630),
-  a wider crop of the same product photo. Used in the Open Graph and
-  Twitter Card meta tags on the home, order, and contact pages.
+  favicon/home-screen icons.
+- `public/img/og-image.jpg` — the social share preview image (1200×630).
 
 Every `og:image`, `og:url`, and `twitter:image` tag points at
-`https://boxedindulgence.com/...` — social platforms need an absolute URL to
-fetch the preview image. If the site ever ends up live on a different
-domain, these need to be updated to match (find/replace across the three
-`public/*/index.html` files that have them) or the link previews won't
-show an image when the site is shared.
+`https://boxedindulgence.com/...`. If the site ever moves to a different
+domain, update those (find/replace across `public/*/index.html`) or link
+previews won't show an image when shared.
 
-If a social feed section gets added later (Instagram, etc.), it'll need the
-client's real handle and either manually-dropped photos or a no-code embed
-widget (SnapWidget, Elfsight) — Instagram's API requires the client's own
-Business account connected through Meta's Graph API.
+## Deploying from GitHub
+
+**Option A — GitHub Actions** (`.github/workflows/deploy.yml`): deploys on
+every push to `main`. Requires repo secrets `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID`.
+
+**Option B — Cloudflare Workers Builds**: dashboard → Workers & Pages → your
+worker → Settings → Builds → connected to GitHub. Deploys automatically on
+push. Make sure the Worker's name in the dashboard matches `wrangler.jsonc`'s
+`"name"` (`boxed-indul-site`).
+
+**Either way**: a deploy will fail if `d1_databases[0].database_id` in
+`wrangler.jsonc` is still the placeholder — complete step 1 of the go-live
+checklist first.
 
 ## Project structure
 
 ```
-public/index.html               Home page
-public/booking/index.html        Order page (calendar + request form)
-public/booking/checkout/         Simulated deposit page (sandbox only)
-public/contact/index.html        Contact page
-public/admin/index.html          Admin approval page
-public/js/mock-db.js             Sandbox "database" (localStorage) — sandbox only
-public/js/booking.js, contact.js, admin.js, checkout.js   Sandbox frontend logic
-public/data/content.json         Editable seasonal content (promos/boxes/testimonials)
-public/img/                      Logo, wordmark, hero photo, chef avatar — all real brand assets
-src/                              Real backend (D1 + Stripe + Resend) — not currently wired in
-going-live-reference/             Archived live frontend JS + wrangler config, for later
-schema.sql                        D1 database schema (for going-live)
-wrangler.jsonc                    Cloudflare config — currently assets-only
+public/index.html                 Home page (+ lunch-sale block)
+public/booking/index.html         Custom order page (calendar + itemized form)
+public/booking/checkout/          Real deposit checkout bridge page (permanent — not simulated)
+public/lunch-sale/index.html      Lunch-sale order page + notify-me signup
+public/contact/index.html         Contact page
+public/admin/index.html           Admin dashboard (Cloudflare Access-gated)
+public/js/                        Live frontend scripts (main, booking, checkout, contact, admin, lunch-sale, menu-selector)
+public/data/content.json          Editable seasonal content + order menu pricing
+public/img/                       Logo, wordmark, hero photo, chef avatar — real brand assets
+src/                               The Worker (routes, D1 queries, Stripe, email, Access, Calendar)
+going-live-reference/             Historical snapshot from sandbox mode — safe to delete
+schema.sql                        D1 database schema
+wrangler.jsonc                    Cloudflare config (Worker + D1 + vars)
 ```

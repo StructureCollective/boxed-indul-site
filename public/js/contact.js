@@ -1,29 +1,16 @@
-// Contact form — sandbox version. Stores the message in MockDB
-// (localStorage) instead of emailing it anywhere.
-
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("contactForm");
   if (form) form.addEventListener("submit", onSubmit);
 });
 
-function onSubmit(e) {
+async function onSubmit(e) {
   e.preventDefault();
   const msgEl = document.getElementById("formMsg");
   const submitBtn = document.getElementById("submitBtn");
 
-  const name = document.getElementById("name").value.trim();
-  const email = document.getElementById("email").value.trim();
-  const message = document.getElementById("message").value.trim();
-
-  if (!name || !email || !message) {
-    showMsg(msgEl, "error", "Please fill in your name, email, and message.");
-    return;
-  }
-
   const payload = {
-    id: MockDB.newId(),
-    name,
-    email,
+    name: document.getElementById("name").value.trim(),
+    email: document.getElementById("email").value.trim(),
     phone: document.getElementById("phone").value.trim(),
     guest_count: document.getElementById("guest_count").value
       ? Number(document.getElementById("guest_count").value)
@@ -31,19 +18,36 @@ function onSubmit(e) {
     event_date: document.getElementById("event_date").value || null,
     budget: document.getElementById("budget").value.trim(),
     location: document.getElementById("location").value.trim(),
-    message,
-    created_at: MockDB.nowIso(),
+    message: document.getElementById("message").value.trim(),
   };
 
   submitBtn.disabled = true;
   submitBtn.textContent = "Sending…";
 
-  setTimeout(() => {
-    MockDB.addContact(payload);
-    showMsg(msgEl, "success", "Message sent! (In the live site this emails the business owner directly.)");
+  try {
+    const res = await fetch("/api/contact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showMsg(msgEl, "error", data.error || "Something went wrong — please try again.");
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Send Message";
+      return;
+    }
+
+    showMsg(msgEl, "success", "Message sent! We'll get back to you soon.");
     document.getElementById("contactForm").reset();
     submitBtn.textContent = "Message Sent";
-  }, 400);
+  } catch (err) {
+    console.error(err);
+    showMsg(msgEl, "error", "Network error — please try again.");
+    submitBtn.disabled = false;
+    submitBtn.textContent = "Send Message";
+  }
 }
 
 function showMsg(el, type, text) {
