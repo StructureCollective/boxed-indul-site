@@ -212,6 +212,14 @@ Every image on the site is a real supplied brand asset:
   favicon/home-screen icons.
 - `public/img/og-image.jpg` — the social share preview image (1200×630).
 
+`public/manifest.json` is the web app manifest — it points Android/Chrome's
+"Add to Home Screen" / "Install app" flow at `icon-192.png`/`icon-512.png`
+and sets the app name and theme color. iOS uses `apple-touch-icon.png`
+directly (via the `<link rel="apple-touch-icon">` tag) rather than the
+manifest. To change the home-screen icon, replace those three PNGs (180×180,
+192×192, 512×512 — all square, opaque background) and redeploy; no other
+changes are needed.
+
 Every `og:image`, `og:url`, and `twitter:image` tag points at
 `https://boxedindulgence.com/...`. If the site ever moves to a different
 domain, update those (find/replace across `public/*/index.html`) or link
