@@ -10,7 +10,19 @@ function formBody(obj, prefix = "") {
   function walk(o, p) {
     for (const [k, v] of Object.entries(o)) {
       const key = p ? `${p}[${k}]` : k;
-      if (v && typeof v === "object" && !Array.isArray(v)) {
+      if (Array.isArray(v)) {
+        // Stripe's form encoding for list params (e.g. payment_method_types)
+        // is indexed brackets: key[0]=a&key[1]=b — plain URLSearchParams
+        // would otherwise stringify the whole array into one value.
+        v.forEach((item, i) => {
+          const arrKey = `${key}[${i}]`;
+          if (item && typeof item === "object") {
+            walk(item, arrKey);
+          } else {
+            params.append(arrKey, item);
+          }
+        });
+      } else if (v && typeof v === "object") {
         walk(v, key);
       } else {
         params.append(key, v);
@@ -52,13 +64,20 @@ async function stripeGet(env, path) {
 
 // Both checkout flows are embedded directly on our own pages using Stripe
 // Elements (Payment Element + Express Checkout Element for Apple Pay/Google
-// Pay/Link, plus a Link Authentication Element to collect/confirm the
-// customer's email right at checkout) — no redirect to a Stripe-hosted page.
-// A PaymentIntent (not a Checkout Session) backs this: the client mounts
+// Pay, plus a Link Authentication Element to collect/confirm the customer's
+// email right at checkout) — no redirect to a Stripe-hosted page. A
+// PaymentIntent (not a Checkout Session) backs this: the client mounts
 // Elements with the PaymentIntent's client_secret, then calls
-// stripe.confirmPayment() itself. automatic_payment_methods lets Stripe
-// decide which methods to show based on the Dashboard's payment method
-// settings, so wallets "just work" once enabled there.
+// stripe.confirmPayment() itself.
+//
+// PAYMENT_METHOD_TYPES pins the exact list of methods offered, instead of
+// automatic_payment_methods (which shows whatever's toggled on in the
+// Stripe Dashboard). Card covers Apple Pay/Google Pay automatically in
+// browsers/devices that support them via the Express Checkout Element —
+// there's no separate "apple_pay" type to request. Klarna, Affirm, Amazon
+// Pay, and Link are deliberately left out here regardless of what's enabled
+// in the Dashboard.
+const PAYMENT_METHOD_TYPES = ["card", "cashapp"];
 
 // Creates a fresh PaymentIntent for a booking's deposit, the moment the
 // customer's /booking/checkout/ page loads (not at admin-approval time —
@@ -70,7 +89,7 @@ export async function createDepositPaymentIntent(env, booking) {
   return stripeRequest(env, "/payment_intents", {
     amount: booking.deposit_amount_cents,
     currency: env.DEPOSIT_CURRENCY || "usd",
-    automatic_payment_methods: { enabled: true },
+    payment_method_types: PAYMENT_METHOD_TYPES,
     receipt_email: booking.email,
     description: `${env.BUSINESS_NAME} — Order deposit (${booking.event_date})`,
     metadata: {
@@ -86,7 +105,7 @@ export async function createLunchSalePaymentIntent(env, order, event) {
   return stripeRequest(env, "/payment_intents", {
     amount: order.total_cents,
     currency: env.DEPOSIT_CURRENCY || "usd",
-    automatic_payment_methods: { enabled: true },
+    payment_method_types: PAYMENT_METHOD_TYPES,
     receipt_email: order.email,
     description: `${event.title} — ${order.dropoff_choice}`,
     metadata: {

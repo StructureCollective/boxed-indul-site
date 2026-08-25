@@ -1,0 +1,1 @@
+ALTER TABLE lunch_sale_events ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;

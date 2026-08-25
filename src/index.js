@@ -573,13 +573,23 @@ async function handleCreateLunchSaleOrder(request, env, pathname) {
     return badRequest(`Max ${event.max_qty_per_order || 10} lunches per order.`);
   }
 
-  // D1 doesn't give us row-level locking, so we recheck the count right
-  // before inserting to keep the race window as small as practical. A
-  // determined double-click could still slip one order past the cap in a
-  // rare race; the admin table makes any overage easy to spot and refund.
-  const activeCount = await countActiveLunchSaleOrders(env, eventId);
-  if (activeCount >= event.slot_cap) {
+  // D1 doesn't give us row-level locking, so we recheck the reserved
+  // quantity right before inserting to keep the race window as small as
+  // practical. A determined double-click could still slip an order past the
+  // cap in a rare race; the admin table makes any overage easy to spot and
+  // refund. slot_cap is a cap on total lunches (sum of quantity), not a cap
+  // on the number of orders, so this has to check qty against what's left,
+  // not just whether any slot exists at all.
+  const activeQuantity = await countActiveLunchSaleOrders(env, eventId);
+  const remaining = event.slot_cap - activeQuantity;
+  if (remaining <= 0) {
     return json({ error: "Sorry, this lunch sale is sold out." }, 409);
+  }
+  if (qty > remaining) {
+    return json(
+      { error: `Only ${remaining} lunch${remaining === 1 ? "" : "es"} left — please lower your quantity.` },
+      409
+    );
   }
 
   const order = {
@@ -825,9 +835,15 @@ async function handleAdminUpdateLunchSaleEvent(request, env, pathname) {
     "max_qty_per_order",
     "status",
     "image_url",
+    "archived",
+    "cutoff_extended",
   ];
   const fields = {};
   for (const k of allowed) if (body[k] !== undefined) fields[k] = body[k];
+  // D1 has no boolean bind type — coerce to 0/1 so this can't throw a bind
+  // error regardless of whether the client sent true/false or 1/0.
+  if (fields.archived !== undefined) fields.archived = fields.archived ? 1 : 0;
+  if (fields.cutoff_extended !== undefined) fields.cutoff_extended = fields.cutoff_extended ? 1 : 0;
   if (!Object.keys(fields).length) return badRequest("Nothing to update");
 
   await updateLunchSaleEvent(env, id, fields);
@@ -845,7 +861,7 @@ async function handleAdminDeleteLunchSaleEvent(env, pathname) {
       {
         error: `Can't delete — ${orderCount} order${
           orderCount === 1 ? "" : "s"
-        } are on file for this event. Cancel it instead to keep the order history intact.`,
+        } are on file for this event. Archive it instead to hide it from the list while keeping the order history intact.`,
       },
       400
     );

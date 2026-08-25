@@ -40,6 +40,16 @@
   .status-draft { background: rgba(20,18,13,0.08); color: var(--muted); }
   .status-closed { background: rgba(20,18,13,0.08); color: var(--muted); }
   .status-canceled { background: rgba(122,46,46,0.14); color: var(--maroon); }
+  .status-extended { background: rgba(182,134,47,0.22); color: var(--rust-dark); }
+  .status-ended { background: rgba(122,46,46,0.16); color: var(--maroon); font-weight: 700; }
+  @keyframes pulseLive {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(46,125,50,0.55); }
+    50% { box-shadow: 0 0 0 6px rgba(46,125,50,0); }
+  }
+  .status-live-flash {
+    background: #2e7d32; color: #fff; font-weight: 700;
+    animation: pulseLive 1.6s ease-in-out infinite;
+  }
   .status-paid { background: rgba(85,96,63,0.22); color: var(--green-dark); }
   .status-pending_payment { background: rgba(182,134,47,0.14); color: var(--rust-dark); }
   .status-pending { background: rgba(182,134,47,0.14); color: var(--rust-dark); }
@@ -92,6 +102,7 @@
   .admin-topbar a.back:hover { color: var(--green-dark); }
   .admin-card { border-top: 3px solid var(--green); }
   .event-card { border-left: 3px solid var(--green); }
+  .event-card.archived { opacity: 0.6; border-left-color: var(--muted); }
   .admin-wrap .btn-primary { background: var(--green); }
   .admin-wrap .btn-primary:hover { background: var(--green-dark); }
   .admin-wrap .btn-outline:hover { border-color: var(--green); color: var(--green-dark); }
@@ -186,6 +197,13 @@
       <h3>New Lunch Sale Event</h3>
       <form id="lunchEventForm">
         <div class="field">
+          <label for="ev_template">Copy details from a previous sale (optional)</label>
+          <select id="ev_template">
+            <option value="">— Start blank —</option>
+          </select>
+          <p class="subtle" style="margin-top:4px;">Fills in the menu, price, cap, max quantity, photo, and drop-offs from a past sale. Title, sale date, and cutoff are always left blank — this always creates its own brand-new event, so order history stays separate per sale.</p>
+        </div>
+        <div class="field">
           <label for="ev_title">Title</label>
           <input type="text" id="ev_title" required placeholder="e.g. Friday Lunch Drop — Oct 3">
         </div>
@@ -209,7 +227,7 @@
             <input type="datetime-local" id="ev_cutoff" required>
           </div>
           <div class="field">
-            <label for="ev_slot_cap">Slot cap (max orders)</label>
+            <label for="ev_slot_cap">Lunch cap (total lunches for this sale)</label>
             <input type="number" id="ev_slot_cap" min="1" value="20" required>
           </div>
         </div>
@@ -242,7 +260,12 @@
     <div class="admin-card">
       <div class="admin-toolbar" style="margin-bottom:14px;">
         <h3 style="margin:0;">Events</h3>
-        <button class="btn btn-outline" id="eventsRefresh">Refresh</button>
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:normal;">
+            <input type="checkbox" id="showArchivedEvents" style="width:auto;"> Show archived
+          </label>
+          <button class="btn btn-outline" id="eventsRefresh">Refresh</button>
+        </div>
       </div>
       <div id="eventsList"><p class="subtle">Loading…</p></div>
     </div>

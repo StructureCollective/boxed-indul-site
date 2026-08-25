@@ -50,10 +50,15 @@ function renderLunchSale(el, event) {
   const remaining = event.slots_remaining ?? Math.max(0, event.slot_cap - (event.slots_used || 0));
   const low = remaining <= Math.max(1, Math.round(event.slot_cap * 0.2));
   const dropoffs = safeParseDropoffs(event.dropoff_options);
+  const extendedBanner = event.cutoff_extended
+    ? `<div class="cutoff-extended-banner">⏰ Order cutoff extended — place your order now!</div>`
+    : "";
 
   el.innerHTML = `
     <div class="lunch-card">
-      <span class="slots-left${low ? " low" : ""}">${remaining} order${remaining === 1 ? "" : "s"} left</span>
+      ${extendedBanner}
+      <span class="slots-left${low ? " low" : ""}">${remaining} lunch${remaining === 1 ? "" : "es"} left</span>
+      <span class="live-badge">Live: Order Now</span>
       <h3 style="margin-bottom:6px;">${escapeHtml(event.title)}</h3>
       <p style="margin-bottom:14px;">${escapeHtml(event.menu_description)}</p>
       <p style="margin-bottom:6px;font-size:0.9rem;"><strong>For:</strong> ${formatDate(event.sale_date)}</p>

@@ -516,6 +516,21 @@ table.data-table .row-actions .btn { padding: 6px 12px; font-size: 0.7rem; }
 .lunch-card .slots-left { display: inline-block; padding: 4px 10px; border-radius: 999px; background: rgba(85,96,63,0.12); color: var(--green-dark); font-size: 0.75rem; font-weight: 700; margin-bottom: 10px; }
 .lunch-card .slots-left.low { background: rgba(122,46,46,0.1); color: var(--maroon); }
 .lunch-none-card { text-align: center; padding: 48px 24px; border: 1px dashed var(--line); border-radius: var(--radius); }
+.cutoff-extended-banner {
+  background: rgba(182,134,47,0.14); color: var(--rust-dark); border: 1px solid rgba(182,134,47,0.35);
+  border-radius: 8px; padding: 10px 14px; font-weight: 700; font-size: 0.85rem; text-align: center;
+  margin-bottom: 14px;
+}
+@keyframes pulseLiveBadge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(46,125,50,0.45); }
+  50% { box-shadow: 0 0 0 7px rgba(46,125,50,0); }
+}
+.live-badge {
+  display: inline-block; padding: 4px 12px; border-radius: 999px; margin-left: 8px; margin-bottom: 10px;
+  background: #2e7d32; color: #fff; font-size: 0.72rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  animation: pulseLiveBadge 1.6s ease-in-out infinite;
+}
 .qty-row { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
 .qty-row button { width: 36px; height: 36px; border: 1px solid var(--line); background: var(--white); border-radius: 6px; font-size: 1.1rem; cursor: pointer; }
 .qty-row input { width: 60px; text-align: center; padding: 8px; border: 1px solid var(--line); border-radius: 6px; font-family: var(--font-body); }

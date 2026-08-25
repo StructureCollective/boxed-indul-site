@@ -47,6 +47,16 @@ the `site_settings` table (seeded with your current order-menu pricing and
 occasion options) and an `image_url` column on `lunch_sale_events`, both of
 which `schema.sql` now includes by default. Safe to run more than once.
 
+If your database already existed before Archive was added for lunch sale
+events, also run `migration-archive-lunch-events.sql` in the D1 Console —
+it adds the `archived` column `schema.sql` now includes by default. Safe to
+run more than once.
+
+If your database already existed before the Extend Cutoff feature was
+added, also run `migration-cutoff-extended.sql` in the D1 Console — it adds
+the `cutoff_extended` column `schema.sql` now includes by default. Safe to
+run more than once.
+
 ### 2. Set up Cloudflare Access (Zero Trust) for `/admin/*`
 
 This is what replaces the old admin passcode with a real sign-in — only the
@@ -239,5 +249,7 @@ going-live-reference/             Historical snapshot from sandbox mode — safe
 schema.sql                        D1 database schema
 migration-payment-intents.sql     Adds stripe_payment_intent_id columns to an already-created D1 database
 migration-site-settings.sql       Adds the site_settings table (order menus + occasions) and lunch_sale_events.image_url to an already-created D1 database
+migration-archive-lunch-events.sql Adds the lunch_sale_events.archived column to an already-created D1 database
+migration-cutoff-extended.sql     Adds the lunch_sale_events.cutoff_extended column to an already-created D1 database
 wrangler.jsonc                    Cloudflare config (Worker + D1 + vars)
 ```

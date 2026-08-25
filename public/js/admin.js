@@ -270,6 +270,73 @@ function wireLunchEvents() {
   document.getElementById("addDropoff").addEventListener("click", () => addDropoffRow());
   document.getElementById("lunchEventForm").addEventListener("submit", onCreateLunchEvent);
   document.getElementById("eventsRefresh").addEventListener("click", loadLunchEvents);
+  document.getElementById("showArchivedEvents").addEventListener("change", renderLunchEvents);
+  document.getElementById("ev_template").addEventListener("change", onTemplateSelected);
+}
+
+// Keeps the "copy details from a previous sale" dropdown in sync with
+// whatever events exist. Sorted most-recent sale first so the admin's most
+// likely pick is at the top.
+function populateTemplateEventSelect() {
+  const sel = document.getElementById("ev_template");
+  if (!sel) return;
+  const current = sel.value;
+  const sorted = [...lunchEvents].sort((a, b) => (b.sale_date || "").localeCompare(a.sale_date || ""));
+  sel.innerHTML =
+    `<option value="">— Start blank —</option>` +
+    sorted
+      .map(
+        (ev) =>
+          `<option value="${escapeHtml(ev.id)}">${escapeHtml(ev.title)} — ${escapeHtml(
+            formatShortDate(ev.sale_date)
+          )}</option>`
+      )
+      .join("");
+  if (current && lunchEvents.some((ev) => ev.id === current)) sel.value = current;
+}
+
+// Autofills the New Lunch Sale Event form from a previously created event.
+// Title, sale date, and cutoff are deliberately left untouched — the admin
+// always supplies fresh ones, and onCreateLunchEvent always POSTs a new
+// record (newId()), so this can never overwrite or merge into a prior sale's
+// order history.
+function onTemplateSelected() {
+  const id = document.getElementById("ev_template").value;
+  if (!id) return;
+  const ev = lunchEvents.find((e) => e.id === id);
+  if (!ev) return;
+
+  document.getElementById("ev_menu").value = ev.menu_description || "";
+  document.getElementById("ev_price").value =
+    ev.price_cents != null ? (ev.price_cents / 100).toFixed(2) : "";
+  document.getElementById("ev_slot_cap").value = ev.slot_cap ?? "";
+  document.getElementById("ev_max_qty").value = ev.max_qty_per_order ?? "";
+  document.getElementById("ev_image_url").value = ev.image_url || "";
+  fillDropoffRows(parseOrderItems(ev.dropoff_options));
+
+  showMsg(
+    document.getElementById("lunchEventMsg"),
+    "success",
+    "Copied. Give this sale its own title, sale date, and cutoff below — it'll be saved as a brand-new event with its own order history."
+  );
+}
+
+// Rebuilds the drop-off rows from a template event's saved drop-off list.
+function fillDropoffRows(dropoffs) {
+  const wrap = document.getElementById("dropoffRows");
+  wrap.innerHTML = "";
+  dropoffRowCount = 0;
+  if (!dropoffs.length) {
+    addDropoffRow();
+    return;
+  }
+  dropoffs.forEach((d) => {
+    addDropoffRow();
+    const rows = wrap.querySelectorAll(".dropoff-row");
+    const row = rows[rows.length - 1];
+    row.querySelector(".dropoff-time").value = d.time || "";
+    row.querySelector(".dropoff-location").value = d.location || "";
+  });
 }
 
 function addDropoffRow() {
@@ -342,6 +409,7 @@ async function loadLunchEvents() {
     lunchEvents = data.events || [];
     renderLunchEvents();
     populateOrdersEventFilter();
+    populateTemplateEventSelect();
     renderDashboard();
   } catch (err) {
     showGlobalMsg("error", err.message);
@@ -350,11 +418,24 @@ async function loadLunchEvents() {
 
 function renderLunchEvents() {
   const list = document.getElementById("eventsList");
+  const showArchived = document.getElementById("showArchivedEvents")?.checked;
+  const visible = showArchived ? lunchEvents : lunchEvents.filter((ev) => !ev.archived);
+  const archivedCount = lunchEvents.length - lunchEvents.filter((ev) => !ev.archived).length;
+
   if (!lunchEvents.length) {
     list.innerHTML = `<p class="subtle">No lunch sale events yet — create one above.</p>`;
     return;
   }
-  list.innerHTML = lunchEvents.map(eventCard).join("");
+  if (!visible.length) {
+    list.innerHTML = `<p class="subtle">All events are archived. Check "Show archived" above to see them.</p>`;
+    return;
+  }
+
+  list.innerHTML =
+    visible.map(eventCard).join("") +
+    (!showArchived && archivedCount
+      ? `<p class="subtle">${archivedCount} archived event${archivedCount === 1 ? "" : "s"} hidden — check "Show archived" above to see them.</p>`
+      : "");
 
   list.querySelectorAll("[data-set-status]").forEach((btn) =>
     btn.addEventListener("click", () => setEventStatus(btn.dataset.setStatus, btn.dataset.status))
@@ -367,6 +448,21 @@ function renderLunchEvents() {
   );
   list.querySelectorAll("[data-export-event]").forEach((btn) =>
     btn.addEventListener("click", () => exportEventOrders(btn.dataset.exportEvent))
+  );
+  list.querySelectorAll("[data-archive-event]").forEach((btn) =>
+    btn.addEventListener("click", () => setEventArchived(btn.dataset.archiveEvent, true))
+  );
+  list.querySelectorAll("[data-unarchive-event]").forEach((btn) =>
+    btn.addEventListener("click", () => setEventArchived(btn.dataset.unarchiveEvent, false))
+  );
+  list.querySelectorAll("[data-toggle-extend]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const row = btn.closest(".event-card")?.querySelector(".extend-cutoff-row");
+      if (row) row.style.display = row.style.display === "none" ? "flex" : "none";
+    })
+  );
+  list.querySelectorAll("[data-extend-cutoff]").forEach((btn) =>
+    btn.addEventListener("click", () => extendCutoff(btn.dataset.extendCutoff))
   );
 }
 
@@ -392,6 +488,12 @@ function populateOrdersEventFilter() {
 function eventCard(ev) {
   const dropoffs = parseOrderItems(ev.dropoff_options);
   const dropoffText = dropoffs.map((d) => `${d.time} — ${d.location}`).join(" · ") || "—";
+  // "live" in the DB just means the admin hasn't closed/canceled it — it
+  // doesn't mean orders are still being accepted right now. Once the cutoff
+  // passes, treat it as visually "ended" even though status is still "live",
+  // so the admin isn't misled into thinking it's still orderable.
+  const cutoffPassed = new Date(ev.order_cutoff_at).getTime() < Date.now();
+  const isEnded = ev.status === "live" && cutoffPassed;
 
   let actions = "";
   if (ev.status === "draft") {
@@ -403,25 +505,79 @@ function eventCard(ev) {
   }
   actions += `<button class="btn btn-outline" data-notify="${ev.id}">Notify Signups</button>`;
   actions += `<button class="btn btn-outline" data-export-event="${ev.id}">Export Orders</button>`;
+  if (!ev.archived && (ev.status === "live" || ev.status === "closed")) {
+    actions += `<button class="btn btn-outline" data-toggle-extend="${ev.id}">Extend Cutoff</button>`;
+  }
+  if (ev.archived) {
+    actions += `<button class="btn btn-outline" data-unarchive-event="${ev.id}">Unarchive</button>`;
+  } else if (ev.status !== "live") {
+    // Archiving hides a done sale from the default list without touching
+    // its orders — the alternative to Delete, which is blocked once real
+    // orders exist (see the "Can't delete" error from the API).
+    actions += `<button class="btn btn-outline" data-archive-event="${ev.id}">Archive</button>`;
+  }
   actions += `<button class="btn btn-outline" data-delete-event="${ev.id}" style="border-color:var(--maroon);color:var(--maroon);">Delete</button>`;
 
   const thumb = ev.image_url ? `<img src="${escapeHtml(ev.image_url)}" alt="" class="thumb">` : "";
 
+  const statusPill = isEnded
+    ? `<span class="status-pill status-ended">ended</span>`
+    : ev.status === "live"
+    ? `<span class="status-pill status-live-flash">live</span>`
+    : `<span class="status-pill status-${escapeHtml(ev.status)}">${escapeHtml(ev.status)}</span>`;
+
+  const extendRow =
+    !ev.archived && (ev.status === "live" || ev.status === "closed")
+      ? `
+      <div class="extend-cutoff-row" data-event-id="${ev.id}" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);gap:8px;align-items:center;flex-wrap:wrap;">
+        <label style="font-size:0.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">New cutoff</label>
+        <input type="datetime-local" class="extend-cutoff-input" style="padding:6px 8px;border:1px solid var(--line);border-radius:6px;font-size:0.8rem;">
+        <button type="button" class="btn btn-primary" data-extend-cutoff="${ev.id}" style="padding:6px 12px;font-size:0.7rem;">Save New Cutoff</button>
+      </div>`
+      : "";
+
   return `
-    <div class="event-card">
+    <div class="event-card${ev.archived ? " archived" : ""}">
       ${thumb}
       <div class="top">
         <strong>${escapeHtml(ev.title)}</strong>
-        <span class="status-pill status-${escapeHtml(ev.status)}">${escapeHtml(ev.status)}</span>
+        <span style="display:flex;gap:6px;">
+          ${ev.archived ? `<span class="status-pill status-closed">archived</span>` : ""}
+          ${ev.cutoff_extended ? `<span class="status-pill status-extended">cutoff extended</span>` : ""}
+          ${statusPill}
+        </span>
       </div>
       <p class="subtle" style="margin-bottom:6px;">${escapeHtml(ev.menu_description)}</p>
       <p class="subtle" style="margin-bottom:6px;">
         For ${escapeHtml(ev.sale_date)} · $${(ev.price_cents / 100).toFixed(2)}/lunch ·
-        cap ${escapeHtml(String(ev.slot_cap))} orders · cutoff ${escapeHtml(formatDateTime(ev.order_cutoff_at))}
+        cap ${escapeHtml(String(ev.slot_cap))} lunches · cutoff ${escapeHtml(formatDateTime(ev.order_cutoff_at))}
       </p>
       <p class="subtle" style="margin-bottom:0;">Drop-off: ${escapeHtml(dropoffText)}</p>
       <div class="actions">${actions}</div>
+      ${extendRow}
     </div>`;
+}
+
+// Pushes an event's order cutoff later (optionally reopening a "closed"
+// event) and flags cutoff_extended so the public site shows the "cutoff
+// extended" banner while this stays the current sale.
+async function extendCutoff(id) {
+  const row = document.querySelector(`.extend-cutoff-row[data-event-id="${id}"]`);
+  const input = row?.querySelector(".extend-cutoff-input");
+  if (!input || !input.value) {
+    showGlobalMsg("error", "Pick a new cutoff date & time first.");
+    return;
+  }
+  const ev = lunchEvents.find((e) => e.id === id);
+  const body = { order_cutoff_at: new Date(input.value).toISOString(), cutoff_extended: true };
+  if (ev && ev.status === "closed") body.status = "live";
+  try {
+    await api(`/api/admin/lunch-sale/events/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+    showGlobalMsg("success", "Cutoff extended — the site will show a cutoff-extended banner while this sale is live.");
+    loadLunchEvents();
+  } catch (err) {
+    showGlobalMsg("error", err.message);
+  }
 }
 
 async function setEventStatus(id, status) {
@@ -432,6 +588,19 @@ async function setEventStatus(id, status) {
       body: JSON.stringify({ status }),
     });
     showGlobalMsg("success", `Event status updated to "${status}".`);
+    loadLunchEvents();
+  } catch (err) {
+    showGlobalMsg("error", err.message);
+  }
+}
+
+async function setEventArchived(id, archived) {
+  try {
+    await api(`/api/admin/lunch-sale/events/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ archived }),
+    });
+    showGlobalMsg("success", archived ? "Event archived." : "Event unarchived.");
     loadLunchEvents();
   } catch (err) {
     showGlobalMsg("error", err.message);
@@ -1050,6 +1219,7 @@ function renderDashboardLunchSale() {
 
   const orders = lunchOrders.filter((o) => o.event_id === live.id);
   const paid = orders.filter((o) => o.status === "paid");
+  const paidQty = paid.reduce((sum, o) => sum + (o.quantity || 0), 0);
   const paidTotal = paid.reduce((sum, o) => sum + (o.total_cents || 0), 0);
   const dropoffs =
     parseOrderItems(live.dropoff_options)
@@ -1059,13 +1229,15 @@ function renderDashboardLunchSale() {
 
   el.innerHTML = `
     <div class="dash-stats">
-      <div class="dash-stat"><span class="num">${escapeHtml(String(live.slot_cap))}</span><span class="label">Slot Cap</span></div>
+      <div class="dash-stat"><span class="num">${escapeHtml(String(live.slot_cap))}</span><span class="label">Lunch Cap</span></div>
       <div class="dash-stat"><span class="num">$${(live.price_cents / 100).toFixed(2)}</span><span class="label">Price / Lunch</span></div>
-      <div class="dash-stat"><span class="num">${paid.length}/${live.slot_cap}</span><span class="label">Orders Paid</span></div>
+      <div class="dash-stat"><span class="num">${paidQty}/${live.slot_cap}</span><span class="label">Lunches Paid</span></div>
       <div class="dash-stat"><span class="num">$${(paidTotal / 100).toFixed(2)}</span><span class="label">Payments Received</span></div>
     </div>
-    <p style="margin:14px 0 4px;"><strong>${escapeHtml(live.title)}</strong>${
-    cutoffPassed ? ` <span class="status-pill status-closed">cutoff passed</span>` : ""
+    <p style="margin:14px 0 4px;"><strong>${escapeHtml(live.title)}</strong> ${
+    cutoffPassed
+      ? `<span class="status-pill status-ended">ended</span>`
+      : `<span class="status-pill status-live-flash">live</span>`
   }</p>
     <p class="subtle" style="margin-bottom:4px;">For ${escapeHtml(formatShortDate(live.sale_date))} · cutoff ${escapeHtml(
     formatDateTime(live.order_cutoff_at)

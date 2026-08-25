@@ -181,14 +181,17 @@ export async function getCurrentLiveLunchSaleEvent(env) {
     .first();
   if (!event) return null;
 
-  const { count } = await env.DB.prepare(
-    `SELECT COUNT(*) as count FROM lunch_sale_orders
+  // slot_cap is a cap on total LUNCHES across all orders, not a cap on the
+  // number of order transactions — a single order can request more than
+  // one lunch (quantity), so this has to sum quantity, not COUNT(*) rows.
+  const { total } = await env.DB.prepare(
+    `SELECT COALESCE(SUM(quantity), 0) as total FROM lunch_sale_orders
      WHERE event_id = ? AND status IN ('pending_payment','paid')`
   )
     .bind(event.id)
     .first();
 
-  return { ...event, slots_used: count, slots_remaining: Math.max(0, event.slot_cap - count) };
+  return { ...event, slots_used: total, slots_remaining: Math.max(0, event.slot_cap - total) };
 }
 
 export async function listAllLunchSaleEvents(env) {
@@ -264,16 +267,18 @@ export async function findLunchSaleOrderByPaymentIntent(env, paymentIntentId) {
     .first();
 }
 
-// Counts confirmed/pending slots for an event — used at order time to
-// enforce the cap atomically-ish (see index.js for the D1 transaction note).
+// Total lunches (sum of quantity, not a row count — one order can request
+// several lunches) reserved by confirmed/pending orders for an event — used
+// at order time to enforce the cap atomically-ish (see index.js for the D1
+// transaction note).
 export async function countActiveLunchSaleOrders(env, eventId) {
-  const { count } = await env.DB.prepare(
-    `SELECT COUNT(*) as count FROM lunch_sale_orders
+  const { total } = await env.DB.prepare(
+    `SELECT COALESCE(SUM(quantity), 0) as total FROM lunch_sale_orders
      WHERE event_id = ? AND status IN ('pending_payment','paid')`
   )
     .bind(eventId)
     .first();
-  return count;
+  return total;
 }
 
 export async function listAllLunchSaleOrders(env) {

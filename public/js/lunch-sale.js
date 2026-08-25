@@ -118,13 +118,19 @@ function renderOrderForm(area, event) {
   const closed = soldOut || cutoffPassed;
 
   const thumb = event.image_url ? `<img src="${escapeHtml(event.image_url)}" alt="" class="lunch-thumb">` : "";
+  const extendedBanner =
+    event.cutoff_extended && !closed
+      ? `<div class="cutoff-extended-banner">⏰ Order cutoff extended — place your order now!</div>`
+      : "";
 
   area.innerHTML = `
     <div class="lunch-card" style="max-width:560px;margin:0 auto;">
       ${thumb}
+      ${extendedBanner}
       <span class="slots-left${low ? " low" : ""}">${
-    closed ? "Ordering closed" : `${remaining} order${remaining === 1 ? "" : "s"} left`
+    closed ? "Ordering closed" : `${remaining} lunch${remaining === 1 ? "" : "es"} left`
   }</span>
+      ${!closed ? `<span class="live-badge">Live: Order Now</span>` : ""}
       <h3 style="margin-bottom:6px;">${escapeHtml(event.title)}</h3>
       <p style="margin-bottom:14px;">${escapeHtml(event.menu_description)}</p>
       <p style="margin-bottom:6px;font-size:0.9rem;"><strong>For:</strong> ${formatDate(event.sale_date)}</p>
@@ -159,7 +165,7 @@ function renderOrderForm(area, event) {
             <label>Quantity</label>
             <div class="qty-row">
               <button type="button" id="qtyMinus">−</button>
-              <input type="number" id="quantity" min="1" max="${event.max_qty_per_order || 10}" value="1">
+              <input type="number" id="quantity" min="1" max="${orderMaxQty(event)}" value="1">
               <button type="button" id="qtyPlus">+</button>
             </div>
           </div>
@@ -216,9 +222,17 @@ function renderOrderForm(area, event) {
   }
 }
 
+// The lower of the event's own per-order limit and however many lunches
+// are actually still available — keeps a customer near the end of a sale
+// from filling out the whole form only to get rejected at submit.
+function orderMaxQty(event) {
+  const remaining = event.slots_remaining ?? Math.max(0, event.slot_cap - (event.slots_used || 0));
+  return Math.max(1, Math.min(event.max_qty_per_order || 10, remaining));
+}
+
 function stepQty(delta, event) {
   const input = document.getElementById("quantity");
-  const max = event.max_qty_per_order || 10;
+  const max = orderMaxQty(event);
   let val = Number(input.value) || 1;
   val = Math.min(max, Math.max(1, val + delta));
   input.value = val;

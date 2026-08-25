@@ -76,10 +76,12 @@ CREATE TABLE IF NOT EXISTS lunch_sale_events (
   dropoff_options TEXT NOT NULL,             -- JSON array of {time, location}
   sale_date TEXT NOT NULL,                   -- YYYY-MM-DD the lunches are for
   order_cutoff_at TEXT NOT NULL,             -- ISO timestamp; last moment to order
-  slot_cap INTEGER NOT NULL,                 -- max number of ORDERS (not lunches — qty/order can vary)
+  slot_cap INTEGER NOT NULL,                 -- max total LUNCHES across all orders (sum of quantity, not a count of orders)
   max_qty_per_order INTEGER NOT NULL DEFAULT 10,
   status TEXT NOT NULL DEFAULT 'draft',      -- draft | live | closed | canceled
   image_url TEXT,                            -- optional photo shown on the public order page
+  archived INTEGER NOT NULL DEFAULT 0,       -- hides a past event from the default Events list without deleting its order history
+  cutoff_extended INTEGER NOT NULL DEFAULT 0, -- set when an admin pushes the cutoff later than originally set; drives the "cutoff extended" banner on the public site
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
