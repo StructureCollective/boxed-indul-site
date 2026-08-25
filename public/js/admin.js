@@ -621,7 +621,23 @@ async function deleteLunchEvent(id) {
 async function notifySignups(id) {
   try {
     const data = await api(`/api/admin/lunch-sale/events/${id}/notify-signups`, { method: "POST" });
-    showGlobalMsg("success", `Notified ${data.sent} of ${data.total} signed-up email(s).`);
+    if (!data.total) {
+      showGlobalMsg("error", "No one has signed up for notifications yet — the signup list is empty.");
+    } else if (data.skipped) {
+      showGlobalMsg(
+        "error",
+        `Email isn't fully set up yet — ${data.skipped} email(s) were NOT sent (RESEND_API_KEY is missing on the Worker). Set it via "wrangler secret put RESEND_API_KEY" and try again.`
+      );
+    } else if (data.failed) {
+      showGlobalMsg(
+        "error",
+        `Sent ${data.sent} of ${data.total} — ${data.failed} failed to send${
+          data.error ? `: ${data.error}` : ""
+        }.`
+      );
+    } else {
+      showGlobalMsg("success", `Notified ${data.sent} of ${data.total} signed-up email(s).`);
+    }
   } catch (err) {
     showGlobalMsg("error", err.message);
   }
@@ -713,45 +729,106 @@ async function resendPaymentLink(id) {
   }
 }
 
-// ---- Excel (CSV) export -----------------------------------------------------
-// No spreadsheet library is loaded on the site, so this writes a UTF-8 CSV
-// with a BOM — Excel, Numbers, and Sheets all open that as a normal
-// spreadsheet on double-click without any extra setup.
+// ---- Excel (.xlsx) export ----------------------------------------------------
+// Built with ExcelJS (loaded via CDN script tag in admin/index.html) so the
+// downloaded file is a real, formatted workbook — bold colored header row,
+// currency/date number formats, status color-coding, frozen header, and an
+// autofilter — not just a plain CSV renamed to .xlsx.
 
-const ORDER_CSV_HEADERS = [
-  "Event",
-  "Sale Date",
-  "Name",
-  "Email",
-  "Phone",
-  "Qty",
-  "Drop-off",
-  "Total ($)",
-  "Status",
-  "Ordered At",
+const ORDER_EXPORT_COLUMNS = [
+  { header: "Event", key: "event", width: 28 },
+  { header: "Sale Date", key: "sale_date", width: 12 },
+  { header: "Name", key: "name", width: 20 },
+  { header: "Email", key: "email", width: 26 },
+  { header: "Phone", key: "phone", width: 16 },
+  { header: "Qty", key: "qty", width: 8 },
+  { header: "Drop-off", key: "dropoff", width: 26 },
+  { header: "Total", key: "total", width: 12 },
+  { header: "Status", key: "status", width: 16 },
+  { header: "Ordered At", key: "ordered_at", width: 20 },
 ];
 
-function orderToCsvRow(o) {
-  return [
-    o.event_title,
-    o.event_sale_date,
-    o.name,
-    o.email,
-    o.phone || "",
-    o.quantity,
-    o.dropoff_choice,
-    (o.total_cents / 100).toFixed(2),
-    o.status,
-    formatDateTime(o.created_at),
-  ];
+// Light fills matching the same status meanings used elsewhere in the admin
+// (paid/confirmed = green, pending = amber, canceled/rejected = red).
+const ORDER_STATUS_FILL = {
+  paid: "FFDCE8CC",
+  confirmed: "FFDCE8CC",
+  pending_payment: "FFF6E3C5",
+  pending: "FFF6E3C5",
+  approved: "FFF6E3C5",
+  canceled: "FFF1D6D6",
+  rejected: "FFF1D6D6",
+  refunded: "FFE3E3E3",
+};
+
+async function buildOrdersWorkbook(orders, sheetName) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Boxed Indulgence";
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet(sheetName || "Orders", {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
+  sheet.columns = ORDER_EXPORT_COLUMNS;
+
+  const headerRow = sheet.getRow(1);
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF55603F" } };
+    cell.alignment = { vertical: "middle" };
+  });
+  headerRow.height = 20;
+
+  orders.forEach((o) => {
+    const row = sheet.addRow({
+      event: o.event_title,
+      sale_date: o.event_sale_date,
+      name: o.name,
+      email: o.email,
+      phone: o.phone || "",
+      qty: o.quantity,
+      dropoff: o.dropoff_choice,
+      total: (o.total_cents || 0) / 100,
+      status: o.status,
+      ordered_at: o.created_at ? new Date(o.created_at) : null,
+    });
+    row.getCell("total").numFmt = "$#,##0.00";
+    row.getCell("ordered_at").numFmt = "m/d/yyyy h:mm AM/PM";
+    const fill = ORDER_STATUS_FILL[o.status];
+    if (fill) {
+      row.getCell("status").fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } };
+    }
+    // Wrap long text (drop-off lists, event titles, emails) instead of
+    // letting it overflow into neighboring cells or get truncated. Excel
+    // auto-grows the row height for wrapped text as long as no fixed
+    // height is set, which is the case here.
+    row.eachCell((cell) => {
+      cell.alignment = { ...cell.alignment, wrapText: true, vertical: "top" };
+    });
+  });
+
+  sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: ORDER_EXPORT_COLUMNS.length } };
+
+  return workbook;
 }
 
-function exportOrdersToExcel(orders, filenameBase) {
+async function exportOrdersToExcel(orders, filenameBase) {
   if (!orders.length) {
     showGlobalMsg("error", "No orders to export.");
     return;
   }
-  downloadCsv(`${filenameBase}.csv`, ORDER_CSV_HEADERS, orders.map(orderToCsvRow));
+  if (typeof ExcelJS === "undefined") {
+    showGlobalMsg("error", "The Excel export library didn't load — check your connection and try again.");
+    return;
+  }
+  try {
+    const workbook = await buildOrdersWorkbook(orders, "Orders");
+    const buffer = await workbook.xlsx.writeBuffer();
+    downloadWorkbookBuffer(buffer, `${filenameBase}.xlsx`);
+  } catch (err) {
+    console.error(err);
+    showGlobalMsg("error", "Couldn't build the Excel file — please try again.");
+  }
 }
 
 function exportEventOrders(eventId) {
@@ -761,15 +838,10 @@ function exportEventOrders(eventId) {
   exportOrdersToExcel(orders, base);
 }
 
-function csvEscape(value) {
-  const s = String(value ?? "");
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-function downloadCsv(filename, headers, rows) {
-  const lines = [headers.map(csvEscape).join(","), ...rows.map((row) => row.map(csvEscape).join(","))];
-  // Leading BOM so Excel reads accented characters correctly on open.
-  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+function downloadWorkbookBuffer(buffer, filename) {
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

@@ -877,6 +877,10 @@ async function handleAdminNotifySignups(env, pathname) {
   if (!event) return json({ error: "Not found" }, 404);
 
   const signups = await listLunchSaleSignups(env);
+  if (!signups.length) {
+    return json({ ok: true, sent: 0, skipped: 0, failed: 0, total: 0, error: null });
+  }
+
   const results = await Promise.allSettled(
     signups.map((s) =>
       sendEmail(env, {
@@ -886,8 +890,33 @@ async function handleAdminNotifySignups(env, pathname) {
       })
     )
   );
-  const sent = results.filter((r) => r.status === "fulfilled").length;
-  return json({ ok: true, sent, total: signups.length });
+
+  // sendEmail() resolves (doesn't throw) with { skipped: true } when
+  // RESEND_API_KEY isn't configured, so a naive "fulfilled = sent" count
+  // would silently report success even though nothing actually went out.
+  // Split fulfilled results into real sends vs. skips, and surface the
+  // first real send failure's message so this doesn't fail silently again.
+  let sent = 0;
+  let skipped = 0;
+  let firstError = null;
+  for (const r of results) {
+    if (r.status === "fulfilled") {
+      if (r.value && r.value.skipped) skipped += 1;
+      else sent += 1;
+    } else if (!firstError) {
+      firstError = r.reason?.message || String(r.reason);
+    }
+  }
+  const failed = signups.length - sent - skipped;
+
+  return json({
+    ok: true,
+    sent,
+    skipped,
+    failed,
+    total: signups.length,
+    error: failed > 0 ? firstError : null,
+  });
 }
 
 async function handleAdminResendLunchSalePaymentLink(env, pathname) {
