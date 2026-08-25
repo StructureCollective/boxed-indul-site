@@ -220,6 +220,15 @@ manifest. To change the home-screen icon, replace those three PNGs (180×180,
 192×192, 512×512 — all square, opaque background) and redeploy; no other
 changes are needed.
 
+`/admin/` has its own separate icon set and manifest
+(`apple-touch-icon-admin.png`, `icon-192-admin.png`, `icon-512-admin.png`,
+`public/manifest-admin.json`) so it shows a distinct name/icon on a home
+screen from the customer-facing site — useful since the two admins are the
+ones likely to add `/admin/` to their own phones. Only `public/admin/index.html`
+references these; every other page still points at the regular
+`manifest.json`/`apple-touch-icon.png`. Replace the three `*-admin.png`
+files the same way (same size requirements) to change the admin icon.
+
 Every `og:image`, `og:url`, and `twitter:image` tag points at
 `https://boxedindulgence.com/...`. If the site ever moves to a different
 domain, update those (find/replace across `public/*/index.html`) or link
