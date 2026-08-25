@@ -510,10 +510,13 @@ function eventCard(ev) {
   }
   if (ev.archived) {
     actions += `<button class="btn btn-outline" data-unarchive-event="${ev.id}">Unarchive</button>`;
-  } else if (ev.status !== "live") {
+  } else if (ev.status !== "live" || isEnded) {
     // Archiving hides a done sale from the default list without touching
     // its orders — the alternative to Delete, which is blocked once real
-    // orders exist (see the "Can't delete" error from the API).
+    // orders exist (see the "Can't delete" error from the API). A "live"
+    // event whose cutoff has actually passed (isEnded) is just as done as
+    // a closed/canceled one, so it gets the option too, even though the
+    // DB's status column technically still says "live".
     actions += `<button class="btn btn-outline" data-archive-event="${ev.id}">Archive</button>`;
   }
   actions += `<button class="btn btn-outline" data-delete-event="${ev.id}" style="border-color:var(--maroon);color:var(--maroon);">Delete</button>`;
@@ -909,21 +912,60 @@ function renderContacts() {
 
   const body = document.getElementById("contactsBody");
   if (!filtered.length) {
-    body.innerHTML = `<tr><td colspan="5" class="subtle">No messages found.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="6" class="subtle">No messages found.</td></tr>`;
     return;
   }
-  body.innerHTML = filtered
-    .map(
-      (c) => `
+  body.innerHTML = filtered.map(contactRows).join("");
+
+  body.querySelectorAll("[data-toggle-contact]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const row = body.querySelector(`[data-contact-detail="${btn.dataset.toggleContact}"]`);
+      if (!row) return;
+      const showing = row.style.display !== "none";
+      row.style.display = showing ? "none" : "table-row";
+      btn.textContent = showing ? "Details" : "Hide";
+    })
+  );
+}
+
+// Contact form submissions can optionally include guest count, event date,
+// location, and budget — extra context beyond name/email/message that the
+// main table doesn't have room for. Rendered as a collapsed detail row,
+// expanded on demand, and only offered at all when there's actually
+// something in those optional fields to show.
+function contactRows(c) {
+  const details = [
+    c.guest_count ? `<span><strong>Guests:</strong> ${escapeHtml(String(c.guest_count))}</span>` : "",
+    c.event_date ? `<span><strong>Event date:</strong> ${escapeHtml(formatShortDate(c.event_date))}</span>` : "",
+    c.location ? `<span><strong>Location:</strong> ${escapeHtml(c.location)}</span>` : "",
+    c.budget ? `<span><strong>Budget:</strong> ${escapeHtml(c.budget)}</span>` : "",
+  ]
+    .filter(Boolean)
+    .join("");
+  const hasDetails = Boolean(details);
+
+  const mainRow = `
     <tr>
+      <td>${
+        hasDetails
+          ? `<button type="button" class="btn btn-outline" data-toggle-contact="${c.id}" style="padding:4px 8px;font-size:0.7rem;">Details</button>`
+          : ""
+      }</td>
       <td>${escapeHtml(c.name)}</td>
       <td>${escapeHtml(c.email)}</td>
       <td>${escapeHtml(c.phone || "—")}</td>
       <td>${escapeHtml(formatDateTime(c.created_at))}</td>
       <td class="wrap-cell">${escapeHtml(c.message || "—")}</td>
+    </tr>`;
+
+  const detailRow = hasDetails
+    ? `
+    <tr data-contact-detail="${c.id}" style="display:none;">
+      <td colspan="6"><div class="contact-detail">${details}</div></td>
     </tr>`
-    )
-    .join("");
+    : "";
+
+  return mainRow + detailRow;
 }
 
 // ---- Google Calendar ----------------------------------------------------------
