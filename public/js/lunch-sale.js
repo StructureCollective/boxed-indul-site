@@ -117,8 +117,11 @@ function renderOrderForm(area, event) {
   const cutoffPassed = new Date(event.order_cutoff_at).getTime() < Date.now();
   const closed = soldOut || cutoffPassed;
 
+  const thumb = event.image_url ? `<img src="${escapeHtml(event.image_url)}" alt="" class="lunch-thumb">` : "";
+
   area.innerHTML = `
     <div class="lunch-card" style="max-width:560px;margin:0 auto;">
+      ${thumb}
       <span class="slots-left${low ? " low" : ""}">${
     closed ? "Ordering closed" : `${remaining} order${remaining === 1 ? "" : "s"} left`
   }</span>

@@ -41,12 +41,31 @@
   .status-canceled { background: rgba(122,46,46,0.14); color: var(--maroon); }
   .status-paid { background: rgba(85,96,63,0.22); color: var(--green-dark); }
   .status-pending_payment { background: rgba(182,134,47,0.14); color: var(--rust-dark); }
+  .status-pending { background: rgba(182,134,47,0.14); color: var(--rust-dark); }
+  .status-approved { background: rgba(182,134,47,0.22); color: var(--rust-dark); }
+  .status-rejected { background: rgba(122,46,46,0.14); color: var(--maroon); }
+  .status-confirmed { background: rgba(85,96,63,0.22); color: var(--green-dark); }
   .cal-status-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   .cal-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: var(--maroon); }
   .cal-dot.connected { background: var(--green); }
   .blocked-list { list-style: none; margin: 0; padding: 0; }
   .blocked-list li { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 0.88rem; }
   .blocked-list li:last-child { border-bottom: none; }
+  .menu-category { padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .menu-category:last-of-type { border-bottom: none; margin-bottom: 0; }
+  .menu-category h3 { margin-bottom: 12px; }
+  .menu-group { margin-top: 16px; }
+  .menu-group h4 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
+  .menu-item-rows { display: flex; flex-direction: column; gap: 10px; }
+  .menu-item-row { display: grid; grid-template-columns: 1fr 1fr 90px 60px 1fr 1fr auto; gap: 8px; align-items: start; padding: 10px; border: 1px solid var(--line); border-radius: 6px; }
+  .menu-item-row input[type="text"], .menu-item-row input[type="number"], .menu-item-row input[type="url"] { padding: 8px 10px; border: 1px solid var(--line); border-radius: 5px; font-family: var(--font-body); font-size: 0.82rem; width: 100%; }
+  .menu-item-row .per-guest-wrap { display: flex; align-items: center; gap: 4px; font-size: 0.72rem; color: var(--muted); padding-top: 8px; }
+  .menu-item-row button.remove-item { padding: 8px 10px; font-size: 0.7rem; flex-shrink: 0; }
+  .menu-item-row.occasion-row { grid-template-columns: 1fr 1.4fr auto; }
+  .menu-item-row.quoted-row { grid-template-columns: 1fr 2fr 1fr auto; }
+  .row-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); display: block; margin-bottom: 3px; }
+  .opt-thumb, .lunch-thumb { display: block; width: 100%; max-height: 140px; object-fit: cover; border-radius: 6px; margin-bottom: 8px; }
+  .event-card .thumb { width: 100%; max-height: 160px; object-fit: cover; border-radius: 6px; margin-bottom: 10px; }
 </style>
 </head>
 <body>
@@ -77,6 +96,7 @@
   <div class="admin-tabs">
     <button class="tab-btn active" data-panel="panel-bookings">Custom Orders</button>
     <button class="tab-btn" data-panel="panel-lunch">Lunch Sale</button>
+    <button class="tab-btn" data-panel="panel-menus">Menus</button>
     <button class="tab-btn" data-panel="panel-contacts">Contacts</button>
     <button class="tab-btn" data-panel="panel-calendar">Calendar &amp; Dates</button>
   </div>
@@ -137,6 +157,11 @@
           <input type="number" id="ev_max_qty" min="1" value="10">
         </div>
         <div class="field">
+          <label for="ev_image_url">Photo URL (optional)</label>
+          <input type="url" id="ev_image_url" placeholder="https://…">
+          <p class="subtle" style="margin-top:4px;">Link to an image hosted elsewhere — it'll show on the public lunch sale page.</p>
+        </div>
+        <div class="field">
           <label>Drop-off time(s) &amp; location(s)</label>
           <div class="dropoff-rows" id="dropoffRows"></div>
           <button type="button" class="btn btn-outline" id="addDropoff" style="margin-top:6px;padding:8px 16px;font-size:0.75rem;">+ Add drop-off</button>
@@ -176,9 +201,9 @@
       <div class="table-wrap">
         <table class="data-table" id="ordersTable">
           <thead>
-            <tr><th>Event</th><th>Name</th><th>Email</th><th>Qty</th><th>Drop-off</th><th>Total</th><th>Status</th></tr>
+            <tr><th>Event</th><th>Name</th><th>Email</th><th>Qty</th><th>Drop-off</th><th>Total</th><th>Status</th><th>Actions</th></tr>
           </thead>
-          <tbody id="ordersBody"><tr><td colspan="7" class="subtle">Loading…</td></tr></tbody>
+          <tbody id="ordersBody"><tr><td colspan="8" class="subtle">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -193,6 +218,94 @@
           <thead><tr><th>Email</th><th>Signed Up</th></tr></thead>
           <tbody id="signupsBody"><tr><td colspan="2" class="subtle">Loading…</td></tr></tbody>
         </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Menus & Occasions ===================== -->
+  <section class="admin-panel" id="panel-menus">
+    <div class="admin-card">
+      <div class="admin-toolbar" style="margin-bottom:6px;">
+        <h3 style="margin:0;">Occasions</h3>
+        <button class="btn btn-outline" id="occasionsAdd">+ Add Occasion</button>
+      </div>
+      <p class="subtle" style="margin-bottom:14px;">Shown in the Occasion dropdown on the Custom Order form. Value is used internally; Label is what customers see.</p>
+      <div id="occasionsRows" class="menu-item-rows"></div>
+      <button class="btn btn-primary" id="occasionsSave" style="margin-top:14px;">Save Occasions</button>
+      <div class="form-msg" id="occasionsMsg"></div>
+    </div>
+
+    <div class="admin-card">
+      <p class="subtle" id="menusLoadingMsg">Loading menus…</p>
+      <div id="menuCategories" style="display:none;">
+        <div class="menu-category">
+          <h3>Boxed Lunch</h3>
+          <div class="field">
+            <label for="note_boxed_lunch">Note shown to customers</label>
+            <textarea id="note_boxed_lunch" rows="2"></textarea>
+          </div>
+          <div class="menu-group">
+            <div class="admin-toolbar" style="margin-bottom:10px;">
+              <h4 style="margin:0;">Entrées</h4>
+              <button type="button" class="btn btn-outline" data-add-item="boxed_lunch.entrees">+ Add Entrée</button>
+            </div>
+            <div id="items_boxed_lunch_entrees" class="menu-item-rows"></div>
+          </div>
+          <div class="menu-group">
+            <div class="admin-toolbar" style="margin-bottom:10px;">
+              <h4 style="margin:0;">Enhancements</h4>
+              <button type="button" class="btn btn-outline" data-add-item="boxed_lunch.enhancements">+ Add Enhancement</button>
+            </div>
+            <div id="items_boxed_lunch_enhancements" class="menu-item-rows"></div>
+          </div>
+        </div>
+
+        <div class="menu-category">
+          <h3>Charcuterie Board</h3>
+          <div class="field">
+            <label for="note_charcuterie">Note shown to customers</label>
+            <textarea id="note_charcuterie" rows="2"></textarea>
+          </div>
+          <div class="menu-group">
+            <div class="admin-toolbar" style="margin-bottom:10px;">
+              <h4 style="margin:0;">Boards</h4>
+              <button type="button" class="btn btn-outline" data-add-item="charcuterie.boards">+ Add Board</button>
+            </div>
+            <div id="items_charcuterie_boards" class="menu-item-rows"></div>
+          </div>
+          <div class="menu-group">
+            <div class="admin-toolbar" style="margin-bottom:10px;">
+              <h4 style="margin:0;">Enhancements</h4>
+              <button type="button" class="btn btn-outline" data-add-item="charcuterie.enhancements">+ Add Enhancement</button>
+            </div>
+            <div id="items_charcuterie_enhancements" class="menu-item-rows"></div>
+          </div>
+        </div>
+
+        <div class="menu-category">
+          <h3>Custom Boxed Meal</h3>
+          <div class="field">
+            <label for="note_custom_meal">Note shown to customers</label>
+            <textarea id="note_custom_meal" rows="2"></textarea>
+          </div>
+          <div class="menu-group">
+            <div class="admin-toolbar" style="margin-bottom:10px;">
+              <h4 style="margin:0;">Box Collections</h4>
+              <button type="button" class="btn btn-outline" data-add-item="custom_meal.boxes">+ Add Box</button>
+            </div>
+            <div id="items_custom_meal_boxes" class="menu-item-rows"></div>
+          </div>
+          <div class="menu-group">
+            <div class="admin-toolbar" style="margin-bottom:10px;">
+              <h4 style="margin:0;">Personalization (priced by quote)</h4>
+              <button type="button" class="btn btn-outline" data-add-item="custom_meal.personalization">+ Add Option</button>
+            </div>
+            <div id="items_custom_meal_personalization" class="menu-item-rows"></div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="menusSave" style="width:100%;justify-content:center;">Save All Menus</button>
+        <div class="form-msg" id="menusMsg"></div>
       </div>
     </div>
   </section>

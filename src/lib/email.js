@@ -159,6 +159,23 @@ export function lunchSaleOrderConfirmedEmail(env, order, event) {
   `;
 }
 
+// checkoutPageUrl points at OUR OWN /lunch-sale/checkout/ page, not a raw
+// Stripe URL — same pattern as bookingApprovedEmailToCustomer, so the
+// PaymentIntent backing it is only created the moment the customer opens
+// the page (see handleLunchSaleOrderPaymentIntent in index.js).
+export function lunchSalePaymentLinkEmail(env, order, event, checkoutPageUrl) {
+  return `
+    <h2>Finish your order — ${event.title}</h2>
+    <p>Hi ${order.name}, here's your payment link for ${order.quantity} lunch(es) (${money(
+      order.total_cents
+    )} total).</p>
+    <p><strong>Drop-off:</strong> ${order.dropoff_choice}</p>
+    <p><a href="${checkoutPageUrl}" style="display:inline-block;padding:12px 20px;background:#C08830;color:#fff;text-decoration:none;border-radius:4px;">Pay now</a></p>
+    <p>Orders for this sale close ${new Date(event.order_cutoff_at).toLocaleString()}.</p>
+    <p>— ${env.BUSINESS_NAME}</p>
+  `;
+}
+
 export function lunchSaleSignupConfirmedEmail(env) {
   return `
     <h2>You're on the list!</h2>

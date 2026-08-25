@@ -41,6 +41,12 @@ checkout was added, run `migration-payment-intents.sql` in the D1 Console
 too — it just adds the two `stripe_payment_intent_id` columns `schema.sql`
 now includes by default, so applying it twice is harmless.
 
+If your database already existed before the admin-editable Menus tab was
+added, also run `migration-site-settings.sql` in the D1 Console — it adds
+the `site_settings` table (seeded with your current order-menu pricing and
+occasion options) and an `image_url` column on `lunch_sale_events`, both of
+which `schema.sql` now includes by default. Safe to run more than once.
+
 ### 2. Set up Cloudflare Access (Zero Trust) for `/admin/*`
 
 This is what replaces the old admin passcode with a real sign-in — only the
@@ -226,11 +232,12 @@ public/lunch-sale/index.html      Lunch-sale order page + notify-me signup
 public/contact/index.html         Contact page
 public/admin/index.html           Admin dashboard (Cloudflare Access-gated)
 public/js/                        Live frontend scripts (main, booking, checkout, contact, admin, lunch-sale, menu-selector)
-public/data/content.json          Editable seasonal content + order menu pricing
+public/data/content.json          Editable seasonal content (promotions, homepage menu showcase, testimonials) — order menu pricing and occasions now live in the database, editable from the admin Menus tab
 public/img/                       Logo, wordmark, hero photo, chef avatar — real brand assets
 src/                               The Worker (routes, D1 queries, Stripe, email, Access, Calendar)
 going-live-reference/             Historical snapshot from sandbox mode — safe to delete
 schema.sql                        D1 database schema
 migration-payment-intents.sql     Adds stripe_payment_intent_id columns to an already-created D1 database
+migration-site-settings.sql       Adds the site_settings table (order menus + occasions) and lunch_sale_events.image_url to an already-created D1 database
 wrangler.jsonc                    Cloudflare config (Worker + D1 + vars)
 ```

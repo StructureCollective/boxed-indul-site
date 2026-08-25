@@ -1,23 +1,62 @@
-// Loads public/data/content.json (via the ASSETS binding — the same static
-// file the frontend fetches) and uses its `orderMenus` section as the
-// single source of truth for pricing. This means editing content.json is
-// enough to change prices everywhere; the server never trusts a price sent
-// by the browser.
+// Loads admin-editable menu/occasion data from the `site_settings` D1 table
+// (key: order_menus, occasions) and uses it as the single source of truth
+// for pricing and occasion validation. This means editing the Menus tab in
+// /admin/ is enough to change prices and occasions everywhere; the server
+// never trusts a price sent by the browser.
+//
+// This used to read public/data/content.json via the ASSETS binding, but
+// that's a deployed static file — read-only at runtime, so it couldn't
+// support admin edits without a redeploy. See migration-site-settings.sql /
+// schema.sql's site_settings table for how these rows get seeded.
+
+import { getSetting, setSetting } from "./db.js";
 
 let cachedMenus = null;
-let cachedAt = 0;
-const CACHE_MS = 60_000; // avoid re-fetching the asset on every request
+let cachedMenusAt = 0;
+let cachedOccasions = null;
+let cachedOccasionsAt = 0;
+const CACHE_MS = 60_000; // avoid re-reading D1 on every request
 
 export async function loadOrderMenus(env) {
   const now = Date.now();
-  if (cachedMenus && now - cachedAt < CACHE_MS) return cachedMenus;
+  if (cachedMenus && now - cachedMenusAt < CACHE_MS) return cachedMenus;
 
-  const res = await env.ASSETS.fetch(new URL("/data/content.json", env.SITE_URL));
-  if (!res.ok) throw new Error("Could not load content.json for menu pricing");
-  const content = await res.json();
-  cachedMenus = content.orderMenus || {};
-  cachedAt = now;
+  const menus = await getSetting(env, "order_menus");
+  cachedMenus = menus || {};
+  cachedMenusAt = now;
   return cachedMenus;
+}
+
+export async function saveOrderMenus(env, menus) {
+  await setSetting(env, "order_menus", menus);
+  cachedMenus = menus;
+  cachedMenusAt = Date.now();
+}
+
+export async function loadOccasions(env) {
+  const now = Date.now();
+  if (cachedOccasions && now - cachedOccasionsAt < CACHE_MS) return cachedOccasions;
+
+  const occasions = await getSetting(env, "occasions");
+  cachedOccasions = occasions || [];
+  cachedOccasionsAt = now;
+  return cachedOccasions;
+}
+
+export async function saveOccasions(env, occasions) {
+  await setSetting(env, "occasions", occasions);
+  cachedOccasions = occasions;
+  cachedOccasionsAt = Date.now();
+}
+
+// Clears both in-memory caches immediately after an admin save, so the very
+// next request (even inside the same 60s window) sees the new data instead
+// of waiting out the cache.
+export function invalidateMenuCache() {
+  cachedMenus = null;
+  cachedMenusAt = 0;
+  cachedOccasions = null;
+  cachedOccasionsAt = 0;
 }
 
 function findById(list, id) {

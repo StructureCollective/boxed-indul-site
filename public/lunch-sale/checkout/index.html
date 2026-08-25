@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lunch Order Payment — Boxed Indulgence</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/img/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+<link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/img/logo.png" alt="Boxed Indulgence logo">
+      <span>Boxed <em>Indulgence</em></span>
+    </a>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow">Lunch Sale</p>
+      <h2>Finish Your Order</h2>
+      <p id="summaryText">Loading your order…</p>
+    </div>
+
+    <div class="form-card" id="payCard" style="display:none;">
+      <div class="order-summary" id="orderSummary" style="display:block;"></div>
+
+      <div id="stripeLoading" class="stripe-loading">Loading secure payment…</div>
+
+      <div id="expressCheckoutElement"></div>
+      <div class="stripe-divider" id="stripeDivider" style="display:none;"><span>Or pay with card</span></div>
+
+      <form id="paymentForm" style="display:none;">
+        <div class="field" style="margin-bottom:12px;">
+          <label for="linkAuthenticationElement">Email</label>
+          <div id="linkAuthenticationElement"></div>
+        </div>
+        <div id="paymentElement" style="margin-bottom:20px;"></div>
+        <button type="submit" class="btn btn-primary" id="payBtn" style="width:100%;justify-content:center;">Pay Now</button>
+        <div class="form-msg" id="paymentMessage"></div>
+      </form>
+      <p class="form-note" id="payNote"></p>
+    </div>
+
+    <div class="form-card" id="paidCard" style="display:none;text-align:center;">
+      <p style="margin:0;">This order is already paid — thank you!</p>
+      <a href="/lunch-sale/" class="btn btn-outline" style="margin-top:16px;">Back to Lunch Sale</a>
+    </div>
+
+    <div class="form-card" id="closedCard" style="display:none;text-align:center;">
+      <p style="margin:0;">Ordering has closed for this lunch sale.</p>
+      <p class="form-note">Reply to your order email (or contact us) if you still need help.</p>
+      <a href="/contact/" class="btn btn-outline" style="margin-top:16px;">Contact Us</a>
+    </div>
+
+    <div class="form-card" id="notFoundCard" style="display:none;text-align:center;">
+      <p style="margin:0;">We couldn't find that order.</p>
+      <a href="/lunch-sale/" class="btn btn-outline" style="margin-top:16px;">Back to Lunch Sale</a>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-bottom">
+      © <span id="year"></span> Boxed Indulgence · <a href="/admin/">Admin Sign In</a>
+      <span class="footer-credit">Built by <a href="https://structurecollective.com" target="_blank" rel="noopener"><img src="/img/sc-logo.png" alt="" class="sc-logo">Structure Collective</a></span>
+    </div>
+  </div>
+</footer>
+
+<script src="/js/main.js"></script>
+<script src="https://js.stripe.com/v3/"></script>
+<script src="/js/lunch-sale-checkout.js"></script>
+</body>
+</html>

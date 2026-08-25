@@ -128,8 +128,8 @@ export async function insertLunchSaleEvent(env, ev) {
   await env.DB.prepare(
     `INSERT INTO lunch_sale_events
       (id, title, menu_description, price_cents, dropoff_options, sale_date,
-       order_cutoff_at, slot_cap, max_qty_per_order, status, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+       order_cutoff_at, slot_cap, max_qty_per_order, status, image_url, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`
   )
     .bind(
       ev.id,
@@ -142,6 +142,7 @@ export async function insertLunchSaleEvent(env, ev) {
       ev.slot_cap,
       ev.max_qty_per_order || 10,
       ev.status || "draft",
+      ev.image_url || null,
       ev.created_at,
       ev.updated_at
     )
@@ -326,4 +327,25 @@ export async function getGoogleCalendarConnection(env) {
 
 export async function disconnectGoogleCalendar(env) {
   await env.DB.prepare("DELETE FROM google_calendar_connection WHERE id = 'default'").run();
+}
+
+// ---- site settings (admin-editable order menus & occasions) ---------------
+
+export async function getSetting(env, key) {
+  const row = await env.DB.prepare("SELECT value FROM site_settings WHERE key = ?").bind(key).first();
+  if (!row) return null;
+  try {
+    return JSON.parse(row.value);
+  } catch {
+    return null;
+  }
+}
+
+export async function setSetting(env, key, value) {
+  await env.DB.prepare(
+    `INSERT INTO site_settings (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+  )
+    .bind(key, JSON.stringify(value), new Date().toISOString())
+    .run();
 }

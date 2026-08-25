@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("nextMonth").addEventListener("click", () => shiftMonth(1));
 
   loadMonth();
+  loadOccasions();
 
   MenuSelector.init({
     guestCountElId: "guest_count",
@@ -36,6 +37,22 @@ document.addEventListener("DOMContentLoaded", () => {
     showMsg(msgEl, "error", "Deposit payment was canceled. You can retry from the approval email whenever you're ready.");
   }
 });
+
+async function loadOccasions() {
+  const select = document.getElementById("event_type");
+  if (!select) return;
+  try {
+    const res = await fetch("/api/occasions");
+    const data = await res.json();
+    const occasions = data.occasions || [];
+    select.innerHTML =
+      `<option value="">Select one</option>` +
+      occasions.map((o) => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join("");
+  } catch (err) {
+    console.error("Failed to load occasions", err);
+    select.innerHTML = `<option value="">Select one</option>`;
+  }
+}
 
 async function shiftMonth(delta) {
   state.viewMonth += delta;

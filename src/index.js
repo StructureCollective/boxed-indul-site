@@ -47,6 +47,7 @@ import {
   contactMessageEmailToClient,
   lunchSaleOrderReceivedEmailToClient,
   lunchSaleOrderConfirmedEmail,
+  lunchSalePaymentLinkEmail,
   lunchSaleSignupConfirmedEmail,
   lunchSaleNowLiveEmail,
 } from "./lib/email.js";
@@ -56,7 +57,14 @@ import {
   retrievePaymentIntent,
   verifyStripeWebhook,
 } from "./lib/stripe.js";
-import { priceOrder } from "./lib/menu-data.js";
+import {
+  priceOrder,
+  loadOrderMenus,
+  saveOrderMenus,
+  loadOccasions,
+  saveOccasions,
+  invalidateMenuCache,
+} from "./lib/menu-data.js";
 import { verifyAccessJwt } from "./lib/access.js";
 import {
   buildGoogleAuthUrl,
@@ -65,8 +73,6 @@ import {
   pushBookingToCalendar,
   syncBusyDatesFromCalendar,
 } from "./lib/calendar.js";
-
-const EVENT_TYPES = new Set(["corporate", "wedding", "private"]);
 
 export default {
   async fetch(request, env, ctx) {
@@ -91,6 +97,12 @@ export default {
       if (pathname === "/api/booking" && request.method === "POST") {
         return handleCreateBooking(request, env);
       }
+      if (pathname === "/api/order-menus" && request.method === "GET") {
+        return json({ order_menus: await loadOrderMenus(env) });
+      }
+      if (pathname === "/api/occasions" && request.method === "GET") {
+        return json({ occasions: await loadOccasions(env) });
+      }
       if (pathname.match(/^\/api\/booking\/[^/]+\/checkout-info$/) && request.method === "GET") {
         return handleBookingCheckoutInfo(env, pathname);
       }
@@ -111,6 +123,18 @@ export default {
         request.method === "POST"
       ) {
         return handleCreateLunchSaleOrder(request, env, pathname);
+      }
+      if (
+        pathname.match(/^\/api\/lunch-sale\/order\/[^/]+\/checkout-info$/) &&
+        request.method === "GET"
+      ) {
+        return handleLunchSaleOrderCheckoutInfo(env, pathname);
+      }
+      if (
+        pathname.match(/^\/api\/lunch-sale\/order\/[^/]+\/payment-intent$/) &&
+        request.method === "POST"
+      ) {
+        return handleLunchSaleOrderPaymentIntent(env, pathname);
       }
       if (pathname === "/api/lunch-sale/signup" && request.method === "POST") {
         return handleLunchSaleSignup(request, env);
@@ -223,8 +247,28 @@ async function routeAdmin(request, env, pathname, identity) {
   if (pathname === "/api/admin/lunch-sale/orders" && request.method === "GET") {
     return json({ orders: await listAllLunchSaleOrders(env) });
   }
+  if (
+    pathname.match(/^\/api\/admin\/lunch-sale\/orders\/[^/]+\/resend-payment-link$/) &&
+    request.method === "POST"
+  ) {
+    return handleAdminResendLunchSalePaymentLink(env, pathname);
+  }
   if (pathname === "/api/admin/lunch-sale/signups" && request.method === "GET") {
     return json({ signups: await listLunchSaleSignups(env) });
+  }
+
+  // ---- menus & occasions admin (site_settings) ----
+  if (pathname === "/api/admin/order-menus" && request.method === "GET") {
+    return json({ order_menus: await loadOrderMenus(env) });
+  }
+  if (pathname === "/api/admin/order-menus" && request.method === "PUT") {
+    return handleAdminUpdateOrderMenus(request, env);
+  }
+  if (pathname === "/api/admin/occasions" && request.method === "GET") {
+    return json({ occasions: await loadOccasions(env) });
+  }
+  if (pathname === "/api/admin/occasions" && request.method === "PUT") {
+    return handleAdminUpdateOccasions(request, env);
   }
 
   // ---- Google Calendar admin ----
@@ -319,7 +363,8 @@ async function handleCreateBooking(request, env) {
     return badRequest("Missing required fields");
   }
   if (!isValidEmail(email)) return badRequest("Invalid email");
-  if (!EVENT_TYPES.has(event_type)) return badRequest("Invalid event_type");
+  const occasions = await loadOccasions(env);
+  if (!occasions.some((o) => o.value === event_type)) return badRequest("Invalid event_type");
   if (!isValidDateString(event_date)) return badRequest("Invalid event_date");
   if (!isFutureDate(event_date)) return badRequest("event_date must be in the future");
   const guests = Number(guest_count);
@@ -574,6 +619,66 @@ async function handleCreateLunchSaleOrder(request, env, pathname) {
   });
 }
 
+// Public info for the /lunch-sale/checkout/ page — used both when a
+// customer bounces off mid-payment and comes back, and when the admin
+// resends a payment link for an order that never got paid.
+async function handleLunchSaleOrderCheckoutInfo(env, pathname) {
+  const id = pathname.split("/")[4];
+  const order = await getLunchSaleOrder(env, id);
+  if (!order) return json({ error: "Not found" }, 404);
+  const event = await getLunchSaleEvent(env, order.event_id);
+
+  return json({
+    id: order.id,
+    name: order.name,
+    email: order.email,
+    quantity: order.quantity,
+    dropoff_choice: order.dropoff_choice,
+    total_cents: order.total_cents,
+    status: order.status,
+    event_title: event?.title || null,
+    event_cutoff_passed: event ? new Date(event.order_cutoff_at).getTime() < Date.now() : true,
+  });
+}
+
+// Creates (or reuses) the PaymentIntent for an existing lunch-sale order —
+// mirrors handleCreateDepositPaymentIntent's reuse/recreate logic for
+// bookings. Lets a customer resume payment (or the admin resend a link)
+// without spawning a fresh PaymentIntent every time the page loads.
+async function handleLunchSaleOrderPaymentIntent(env, pathname) {
+  const id = pathname.split("/")[4];
+  const order = await getLunchSaleOrder(env, id);
+  if (!order) return json({ error: "Not found" }, 404);
+  if (order.status !== "pending_payment") {
+    return json({ error: "This order isn't awaiting payment." }, 409);
+  }
+  const event = await getLunchSaleEvent(env, order.event_id);
+  if (!event) return json({ error: "Not found" }, 404);
+  if (new Date(event.order_cutoff_at).getTime() < Date.now()) {
+    return json({ error: "Ordering has closed for this lunch sale." }, 410);
+  }
+
+  let intent = order.stripe_payment_intent_id
+    ? await retrievePaymentIntent(env, order.stripe_payment_intent_id).catch(() => null)
+    : null;
+  const needsNew =
+    !intent || ["canceled", "succeeded"].includes(intent.status) || intent.amount !== order.total_cents;
+
+  if (needsNew) {
+    intent = await createLunchSalePaymentIntent(env, order, event);
+    await updateLunchSaleOrderStatus(env, id, "pending_payment", {
+      stripe_payment_intent_id: intent.id,
+    });
+  }
+
+  return json({
+    client_secret: intent.client_secret,
+    publishable_key: env.STRIPE_PUBLISHABLE_KEY,
+    amount: order.total_cents,
+    currency: env.DEPOSIT_CURRENCY || "usd",
+  });
+}
+
 async function handleLunchSaleSignup(request, env) {
   const body = await request.json().catch(() => null);
   if (!body || !body.email || !isValidEmail(body.email)) {
@@ -696,6 +801,7 @@ async function handleAdminCreateLunchSaleEvent(request, env) {
     slot_cap: Number(slot_cap),
     max_qty_per_order: Number(body.max_qty_per_order || 10),
     status: body.status === "live" ? "live" : "draft",
+    image_url: body.image_url || null,
     created_at: nowIso(),
     updated_at: nowIso(),
   };
@@ -718,6 +824,7 @@ async function handleAdminUpdateLunchSaleEvent(request, env, pathname) {
     "slot_cap",
     "max_qty_per_order",
     "status",
+    "image_url",
   ];
   const fields = {};
   for (const k of allowed) if (body[k] !== undefined) fields[k] = body[k];
@@ -765,6 +872,106 @@ async function handleAdminNotifySignups(env, pathname) {
   );
   const sent = results.filter((r) => r.status === "fulfilled").length;
   return json({ ok: true, sent, total: signups.length });
+}
+
+async function handleAdminResendLunchSalePaymentLink(env, pathname) {
+  const id = pathname.split("/")[5];
+  const order = await getLunchSaleOrder(env, id);
+  if (!order) return json({ error: "Not found" }, 404);
+  if (order.status !== "pending_payment") {
+    return json({ error: "This order is already paid or no longer awaiting payment." }, 400);
+  }
+  const event = await getLunchSaleEvent(env, order.event_id);
+  if (!event) return json({ error: "Event not found." }, 404);
+  if (new Date(event.order_cutoff_at).getTime() < Date.now()) {
+    return json(
+      { error: "Ordering has closed for this lunch sale — cancel this order instead of resending a link." },
+      410
+    );
+  }
+
+  const checkoutPageUrl = `${env.SITE_URL}/lunch-sale/checkout/?order=${id}`;
+  await sendEmail(env, {
+    to: order.email,
+    subject: `Your payment link — ${event.title}`,
+    html: lunchSalePaymentLinkEmail(env, order, event, checkoutPageUrl),
+  });
+
+  return json({ ok: true, checkout_page_url: checkoutPageUrl });
+}
+
+// ---- menus & occasions admin -----------------------------------------------
+
+const REQUIRED_ORDER_MENU_KEYS = ["boxed_lunch", "charcuterie", "custom_meal"];
+
+// Order menus drive real checkout pricing, so this validates the shape
+// before saving rather than trusting whatever the admin UI sends — a
+// malformed save here would break every order/quote on the site.
+function validateOrderMenus(menus) {
+  if (!menus || typeof menus !== "object") return "Menus must be an object.";
+  for (const key of REQUIRED_ORDER_MENU_KEYS) {
+    if (!menus[key] || typeof menus[key] !== "object") return `Missing "${key}" category.`;
+  }
+  const itemListKeys = {
+    boxed_lunch: ["entrees", "enhancements"],
+    charcuterie: ["boards", "enhancements"],
+    custom_meal: ["boxes", "personalization"],
+  };
+  for (const [category, listKeys] of Object.entries(itemListKeys)) {
+    const menu = menus[category];
+    for (const listKey of listKeys) {
+      const list = menu[listKey];
+      if (!Array.isArray(list)) return `"${category}.${listKey}" must be a list.`;
+      for (const item of list) {
+        if (!item || typeof item !== "object") return `Invalid item in "${category}.${listKey}".`;
+        if (!item.id || typeof item.id !== "string") return `Every item in "${category}.${listKey}" needs an id.`;
+        if (!item.name || typeof item.name !== "string")
+          return `Every item in "${category}.${listKey}" needs a name.`;
+        if (item.quoted) continue; // custom_meal.personalization items are priced by quote, not a fixed amount
+        if (typeof item.price_cents !== "number" || item.price_cents < 0 || !Number.isFinite(item.price_cents)) {
+          return `"${item.name}" in "${category}.${listKey}" needs a valid price.`;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function validateOccasions(occasions) {
+  if (!Array.isArray(occasions) || !occasions.length) return "Occasions must be a non-empty list.";
+  const seen = new Set();
+  for (const o of occasions) {
+    if (!o || typeof o !== "object") return "Invalid occasion entry.";
+    if (!o.value || typeof o.value !== "string") return "Every occasion needs a value.";
+    if (!o.label || typeof o.label !== "string") return "Every occasion needs a label.";
+    if (seen.has(o.value)) return `Duplicate occasion value "${o.value}".`;
+    seen.add(o.value);
+  }
+  return null;
+}
+
+async function handleAdminUpdateOrderMenus(request, env) {
+  const body = await request.json().catch(() => null);
+  if (!body || !body.order_menus) return badRequest("Missing order_menus");
+
+  const error = validateOrderMenus(body.order_menus);
+  if (error) return badRequest(error);
+
+  await saveOrderMenus(env, body.order_menus);
+  invalidateMenuCache();
+  return json({ ok: true, order_menus: body.order_menus });
+}
+
+async function handleAdminUpdateOccasions(request, env) {
+  const body = await request.json().catch(() => null);
+  if (!body || !body.occasions) return badRequest("Missing occasions");
+
+  const error = validateOccasions(body.occasions);
+  if (error) return badRequest(error);
+
+  await saveOccasions(env, body.occasions);
+  invalidateMenuCache();
+  return json({ ok: true, occasions: body.occasions });
 }
 
 // ---- stripe webhook ----------------------------------------------------
@@ -859,5 +1066,12 @@ async function handleLunchSalePaid(env, intent) {
     to: paidOrder.email,
     subject: `Order confirmed — ${event.title}`,
     html: lunchSaleOrderConfirmedEmail(env, paidOrder, event),
+  });
+  await sendEmail(env, {
+    to: env.CLIENT_NOTIFY_EMAIL,
+    subject: `Lunch order paid — ${event.title} (${paidOrder.name})`,
+    html: `<p>${paidOrder.name} paid for their lunch order — ${paidOrder.quantity} × ${event.title}, $${(
+      paidOrder.total_cents / 100
+    ).toFixed(2)} total. Drop-off: ${paidOrder.dropoff_choice}.</p>`,
   });
 }

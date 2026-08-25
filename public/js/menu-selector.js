@@ -1,11 +1,12 @@
 // Shared menu-selection UI for /booking/ — renders the Boxed Lunch /
-// Charcuterie / Custom Meal tabs + option cards from /data/content.json's
-// `orderMenus`, tracks the customer's picks, and computes a running total.
-// Shared by public/js/booking.js so pricing logic only needs editing in one
-// place (content.json) and one renderer.
+// Charcuterie / Custom Meal tabs + option cards from /api/order-menus
+// (admin-editable from the Menus tab in /admin/), tracks the customer's
+// picks, and computes a running total. Shared by public/js/booking.js so
+// pricing logic only needs editing in one place (the admin Menus tab) and
+// one renderer.
 //
 // The computed total here is a courtesy preview only — the server always
-// recomputes it from content.json itself before charging anything.
+// recomputes it from the same order-menus data before charging anything.
 
 const MenuSelector = (() => {
   let menus = null;
@@ -23,9 +24,9 @@ const MenuSelector = (() => {
   async function init({ guestCountElId, tabsElId, panelsElId, summaryElId, onChange }) {
     onChangeCb = onChange;
     guestCountEl = document.getElementById(guestCountElId);
-    const res = await fetch("/data/content.json");
-    const content = await res.json();
-    menus = content.orderMenus;
+    const res = await fetch("/api/order-menus");
+    const data = await res.json();
+    menus = data.order_menus;
 
     document.querySelectorAll(`#${tabsElId} .tab-btn`).forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -48,13 +49,15 @@ const MenuSelector = (() => {
     render(panelsElId, summaryElId);
   }
 
-  function optionCard({ groupName, id, name, price_cents, per_guest, quoted, description, type, checked }) {
+  function optionCard({ groupName, id, name, price_cents, per_guest, quoted, description, type, checked, image_url }) {
     const priceLabel = quoted
       ? "Custom quote"
       : `$${(price_cents / 100).toFixed(2)}${per_guest ? " / guest" : ""}`;
+    const thumb = image_url ? `<img src="${image_url}" alt="" class="opt-thumb">` : "";
     return `
       <label class="menu-option">
         <input type="${type}" name="${groupName}" value="${id}" ${checked ? "checked" : ""}>
+        ${thumb}
         <div class="opt-top"><span class="opt-name">${name}</span><span class="opt-price">${priceLabel}</span></div>
         <div class="opt-desc">${description || ""}</div>
       </label>`;

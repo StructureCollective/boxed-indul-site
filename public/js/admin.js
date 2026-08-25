@@ -10,6 +10,8 @@ let lunchOrders = [];
 let signups = [];
 let blockedDates = [];
 let dropoffRowCount = 0;
+let occasions = [];
+let orderMenus = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   const yearEl = document.getElementById("year");
@@ -23,6 +25,8 @@ document.addEventListener("DOMContentLoaded", () => {
   wireCalendar();
   wireBlockedDates();
   wireAdminCalendar();
+  wireOccasions();
+  wireMenus();
 
   loadBookings();
   loadContacts();
@@ -32,6 +36,8 @@ document.addEventListener("DOMContentLoaded", () => {
   loadCalendarStatus();
   loadBlockedDates();
   renderAdminCalendar();
+  loadOccasions();
+  loadOrderMenus();
 
   if (window.location.hash === "#calendar-connected") {
     showGlobalMsg("success", "Google Calendar connected.");
@@ -126,10 +132,18 @@ function renderBookings() {
   );
 }
 
+const BOOKING_STATUS_LABELS = {
+  pending_approval: "Pending Approval",
+  approved: "Awaiting Deposit",
+  rejected: "Rejected",
+  confirmed: "Deposit Paid",
+};
+
 function bookingRow(b) {
   const total = b.order_total_cents != null ? `$${(b.order_total_cents / 100).toFixed(2)}` : "Quoted";
   const deposit = b.deposit_amount_cents != null ? `$${(b.deposit_amount_cents / 100).toFixed(2)}` : "—";
   const statusClass = `status-${b.status === "pending_approval" ? "pending" : b.status}`;
+  const statusLabel = BOOKING_STATUS_LABELS[b.status] || b.status.replace(/_/g, " ");
 
   let actions = `<button class="btn btn-outline" data-details="${b.id}" style="padding:6px 12px;font-size:0.7rem;">Details</button>`;
   if (b.status === "pending_approval") {
@@ -149,7 +163,7 @@ function bookingRow(b) {
       <td>${escapeHtml(String(b.guest_count ?? "—"))}</td>
       <td>${total}</td>
       <td>${deposit}</td>
-      <td><span class="status-pill ${statusClass}">${escapeHtml(b.status.replace(/_/g, " "))}</span></td>
+      <td><span class="status-pill ${statusClass}">${escapeHtml(statusLabel)}</span></td>
       <td><div class="row-actions">${actions}</div></td>
     </tr>
     <tr id="details-${b.id}" style="display:none;">
@@ -298,6 +312,7 @@ async function onCreateLunchEvent(e) {
     slot_cap: Number(document.getElementById("ev_slot_cap").value),
     max_qty_per_order: Number(document.getElementById("ev_max_qty").value) || 10,
     status: document.getElementById("ev_status").value,
+    image_url: document.getElementById("ev_image_url").value.trim() || null,
     dropoff_options,
   };
 
@@ -307,6 +322,7 @@ async function onCreateLunchEvent(e) {
     await api("/api/admin/lunch-sale/events", { method: "POST", body: JSON.stringify(payload) });
     showMsg(msgEl, "success", "Lunch sale event created.");
     document.getElementById("lunchEventForm").reset();
+    document.getElementById("ev_image_url").value = "";
     document.getElementById("dropoffRows").innerHTML = "";
     addDropoffRow();
     loadLunchEvents();
@@ -386,8 +402,11 @@ function eventCard(ev) {
   actions += `<button class="btn btn-outline" data-export-event="${ev.id}">Export Orders</button>`;
   actions += `<button class="btn btn-outline" data-delete-event="${ev.id}" style="border-color:var(--maroon);color:var(--maroon);">Delete</button>`;
 
+  const thumb = ev.image_url ? `<img src="${escapeHtml(ev.image_url)}" alt="" class="thumb">` : "";
+
   return `
     <div class="event-card">
+      ${thumb}
       <div class="top">
         <strong>${escapeHtml(ev.title)}</strong>
         <span class="status-pill status-${escapeHtml(ev.status)}">${escapeHtml(ev.status)}</span>
@@ -484,7 +503,7 @@ function renderLunchOrders() {
   const filtered = getFilteredOrders();
   const body = document.getElementById("ordersBody");
   if (!filtered.length) {
-    body.innerHTML = `<tr><td colspan="7" class="subtle">No orders found.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="8" class="subtle">No orders found.</td></tr>`;
     return;
   }
   body.innerHTML = filtered
@@ -498,9 +517,27 @@ function renderLunchOrders() {
       <td class="wrap-cell">${escapeHtml(o.dropoff_choice)}</td>
       <td>$${(o.total_cents / 100).toFixed(2)}</td>
       <td><span class="status-pill status-${escapeHtml(o.status)}">${escapeHtml(o.status.replace(/_/g, " "))}</span></td>
+      <td><div class="row-actions">${
+        o.status === "pending_payment"
+          ? `<button class="btn btn-outline" data-resend-payment="${o.id}">Resend Payment Link</button>`
+          : ""
+      }</div></td>
     </tr>`
     )
     .join("");
+
+  body.querySelectorAll("[data-resend-payment]").forEach((btn) =>
+    btn.addEventListener("click", () => resendPaymentLink(btn.dataset.resendPayment))
+  );
+}
+
+async function resendPaymentLink(id) {
+  try {
+    await api(`/api/admin/lunch-sale/orders/${id}/resend-payment-link`, { method: "POST" });
+    showGlobalMsg("success", "Payment link resent to the customer.");
+  } catch (err) {
+    showGlobalMsg("error", err.message);
+  }
 }
 
 // ---- Excel (CSV) export -----------------------------------------------------
@@ -949,5 +986,294 @@ function formatShortDate(s) {
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   } catch {
     return s;
+  }
+}
+
+// ---- occasions (Menus tab) --------------------------------------------------
+// Admin-editable list of Occasion options shown on the Custom Order form.
+// Backed by the D1 site_settings table (see src/lib/menu-data.js), so
+// changes here apply immediately with no redeploy.
+
+function wireOccasions() {
+  document.getElementById("occasionsAdd").addEventListener("click", () => {
+    occasions.push({ value: "", label: "" });
+    renderOccasions();
+  });
+  document.getElementById("occasionsSave").addEventListener("click", saveOccasions);
+}
+
+async function loadOccasions() {
+  try {
+    const data = await api("/api/admin/occasions");
+    occasions = data.occasions || [];
+    renderOccasions();
+  } catch (err) {
+    showGlobalMsg("error", err.message);
+  }
+}
+
+function renderOccasions() {
+  const wrap = document.getElementById("occasionsRows");
+  wrap.innerHTML =
+    occasions
+      .map(
+        (o, i) => `
+    <div class="menu-item-row occasion-row">
+      <div><span class="row-label">Value (internal)</span><input type="text" class="occ-value" data-idx="${i}" value="${escapeHtml(
+          o.value
+        )}" placeholder="e.g. corporate"></div>
+      <div><span class="row-label">Label (shown to customers)</span><input type="text" class="occ-label" data-idx="${i}" value="${escapeHtml(
+          o.label
+        )}" placeholder="e.g. Corporate Catering"></div>
+      <button type="button" class="btn btn-outline remove-item" data-remove-occ="${i}">Remove</button>
+    </div>`
+      )
+      .join("") || `<p class="subtle">No occasions yet — add one above.</p>`;
+
+  wrap.querySelectorAll(".occ-value").forEach((el) =>
+    el.addEventListener("input", () => {
+      occasions[Number(el.dataset.idx)].value = el.value;
+    })
+  );
+  wrap.querySelectorAll(".occ-label").forEach((el) =>
+    el.addEventListener("input", () => {
+      occasions[Number(el.dataset.idx)].label = el.value;
+    })
+  );
+  wrap.querySelectorAll("[data-remove-occ]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      occasions.splice(Number(btn.dataset.removeOcc), 1);
+      renderOccasions();
+    })
+  );
+}
+
+async function saveOccasions() {
+  const msgEl = document.getElementById("occasionsMsg");
+  const cleaned = occasions
+    .map((o) => ({ value: (o.value || "").trim(), label: (o.label || "").trim() }))
+    .filter((o) => o.value && o.label);
+
+  if (!cleaned.length) {
+    showMsg(msgEl, "error", "Add at least one occasion with a value and label.");
+    return;
+  }
+  const values = cleaned.map((o) => o.value);
+  if (new Set(values).size !== values.length) {
+    showMsg(msgEl, "error", "Occasion values must be unique.");
+    return;
+  }
+
+  try {
+    await api("/api/admin/occasions", { method: "PUT", body: JSON.stringify({ occasions: cleaned }) });
+    occasions = cleaned;
+    renderOccasions();
+    showMsg(msgEl, "success", "Occasions saved.");
+  } catch (err) {
+    showMsg(msgEl, "error", err.message);
+  }
+}
+
+// ---- order menus (Menus tab) -------------------------------------------------
+// Admin-editable Boxed Lunch / Charcuterie / Custom Meal item catalog —
+// same D1-backed storage as occasions. This is the pricing engine for both
+// the /booking/ order form and the server-side price validation, so blank
+// rows are dropped and prices/ids are normalized before saving.
+
+const MENU_LIST_CONFIG = {
+  boxed_lunch: { entrees: { quoted: false }, enhancements: { quoted: false } },
+  charcuterie: { boards: { quoted: false }, enhancements: { quoted: false } },
+  custom_meal: { boxes: { quoted: false }, personalization: { quoted: true } },
+};
+
+function wireMenus() {
+  document.querySelectorAll("[data-add-item]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const [cat, listKey] = btn.dataset.addItem.split(".");
+      addMenuItem(cat, listKey);
+    })
+  );
+  document.getElementById("menusSave").addEventListener("click", saveOrderMenus);
+  Object.keys(MENU_LIST_CONFIG).forEach((cat) => {
+    document.getElementById(`note_${cat}`).addEventListener("input", (e) => {
+      if (!orderMenus) return;
+      if (!orderMenus[cat]) orderMenus[cat] = {};
+      orderMenus[cat].note = e.target.value;
+    });
+  });
+}
+
+async function loadOrderMenus() {
+  try {
+    const data = await api("/api/admin/order-menus");
+    orderMenus = data.order_menus || {};
+    renderOrderMenus();
+  } catch (err) {
+    showGlobalMsg("error", err.message);
+  }
+}
+
+function renderOrderMenus() {
+  if (!orderMenus) return;
+  document.getElementById("menusLoadingMsg").style.display = "none";
+  document.getElementById("menuCategories").style.display = "block";
+
+  for (const [cat, lists] of Object.entries(MENU_LIST_CONFIG)) {
+    if (!orderMenus[cat]) orderMenus[cat] = {};
+    const menu = orderMenus[cat];
+    const noteEl = document.getElementById(`note_${cat}`);
+    if (noteEl) noteEl.value = menu.note || "";
+    for (const [listKey, { quoted }] of Object.entries(lists)) {
+      if (!Array.isArray(menu[listKey])) menu[listKey] = [];
+      renderItemRows(cat, listKey, quoted);
+    }
+  }
+}
+
+function renderItemRows(cat, listKey, quoted) {
+  const wrap = document.getElementById(`items_${cat}_${listKey}`);
+  if (!wrap) return;
+  const items = orderMenus[cat][listKey];
+
+  wrap.innerHTML =
+    items.map((item, i) => itemRowHtml(cat, listKey, item, i, quoted)).join("") ||
+    `<p class="subtle">No items yet — add one above.</p>`;
+
+  wrap.querySelectorAll("input").forEach((el) => el.addEventListener("input", () => onItemFieldChange(el)));
+  wrap.querySelectorAll("[data-remove-item]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const [c, l, idx] = btn.dataset.removeItem.split(".");
+      removeMenuItem(c, l, Number(idx));
+    })
+  );
+}
+
+function itemRowHtml(cat, listKey, item, i, quoted) {
+  const attrs = `data-cat="${cat}" data-list="${listKey}" data-idx="${i}"`;
+  if (quoted) {
+    return `
+    <div class="menu-item-row quoted-row">
+      <div><span class="row-label">Name</span><input type="text" class="mi-name" ${attrs} value="${escapeHtml(
+      item.name || ""
+    )}"></div>
+      <div><span class="row-label">Description</span><input type="text" class="mi-desc" ${attrs} value="${escapeHtml(
+      item.description || ""
+    )}"></div>
+      <div><span class="row-label">ID</span><input type="text" class="mi-id" ${attrs} value="${escapeHtml(
+      item.id || ""
+    )}" placeholder="auto"></div>
+      <button type="button" class="btn btn-outline remove-item" data-remove-item="${cat}.${listKey}.${i}">Remove</button>
+    </div>`;
+  }
+  return `
+    <div class="menu-item-row">
+      <div><span class="row-label">Name</span><input type="text" class="mi-name" ${attrs} value="${escapeHtml(
+    item.name || ""
+  )}"></div>
+      <div><span class="row-label">Description</span><input type="text" class="mi-desc" ${attrs} value="${escapeHtml(
+    item.description || ""
+  )}"></div>
+      <div><span class="row-label">Price ($)</span><input type="number" min="0" step="0.01" class="mi-price" ${attrs} value="${(
+    (item.price_cents || 0) / 100
+  ).toFixed(2)}"></div>
+      <div class="per-guest-wrap"><label><input type="checkbox" class="mi-perguest" ${attrs} ${
+    item.per_guest ? "checked" : ""
+  }> /guest</label></div>
+      <div><span class="row-label">Image URL</span><input type="url" class="mi-image" ${attrs} value="${escapeHtml(
+    item.image_url || ""
+  )}" placeholder="https://…"></div>
+      <div><span class="row-label">ID</span><input type="text" class="mi-id" ${attrs} value="${escapeHtml(
+    item.id || ""
+  )}" placeholder="auto"></div>
+      <button type="button" class="btn btn-outline remove-item" data-remove-item="${cat}.${listKey}.${i}">Remove</button>
+    </div>`;
+}
+
+function onItemFieldChange(el) {
+  const cat = el.dataset.cat;
+  const listKey = el.dataset.list;
+  const idx = Number(el.dataset.idx);
+  const item = orderMenus?.[cat]?.[listKey]?.[idx];
+  if (!item) return;
+  if (el.classList.contains("mi-name")) item.name = el.value;
+  else if (el.classList.contains("mi-desc")) item.description = el.value;
+  else if (el.classList.contains("mi-id")) item.id = el.value;
+  else if (el.classList.contains("mi-price")) item.price_cents = Math.round((Number(el.value) || 0) * 100);
+  else if (el.classList.contains("mi-perguest")) item.per_guest = el.checked;
+  else if (el.classList.contains("mi-image")) item.image_url = el.value;
+}
+
+function addMenuItem(cat, listKey) {
+  if (!orderMenus) return;
+  if (!orderMenus[cat]) orderMenus[cat] = {};
+  if (!Array.isArray(orderMenus[cat][listKey])) orderMenus[cat][listKey] = [];
+  const quoted = MENU_LIST_CONFIG[cat]?.[listKey]?.quoted;
+  const item = quoted
+    ? { id: "", name: "", description: "", quoted: true }
+    : { id: "", name: "", description: "", price_cents: 0, per_guest: false, image_url: "" };
+  orderMenus[cat][listKey].push(item);
+  renderItemRows(cat, listKey, quoted);
+}
+
+function removeMenuItem(cat, listKey, idx) {
+  if (!orderMenus?.[cat]?.[listKey]) return;
+  orderMenus[cat][listKey].splice(idx, 1);
+  renderItemRows(cat, listKey, MENU_LIST_CONFIG[cat]?.[listKey]?.quoted);
+}
+
+async function saveOrderMenus() {
+  const msgEl = document.getElementById("menusMsg");
+  if (!orderMenus) return;
+
+  // Auto-slug any blank IDs from the item name, and de-dupe collisions —
+  // saves the admin from hand-typing unique ids for every item.
+  for (const [cat, lists] of Object.entries(MENU_LIST_CONFIG)) {
+    for (const listKey of Object.keys(lists)) {
+      const items = orderMenus[cat]?.[listKey] || [];
+      const seen = new Set();
+      for (const item of items) {
+        if (!item.id || !item.id.trim()) item.id = slugify(item.name);
+        let id = item.id;
+        let n = 2;
+        while (seen.has(id)) {
+          id = `${item.id}-${n}`;
+          n += 1;
+        }
+        item.id = id;
+        seen.add(id);
+      }
+    }
+  }
+
+  // Drop rows the admin left blank (no name) and normalize the shape the
+  // server expects before saving — it re-validates on the way in too.
+  const cleaned = {};
+  for (const [cat, lists] of Object.entries(MENU_LIST_CONFIG)) {
+    cleaned[cat] = { label: orderMenus[cat]?.label || cat, note: orderMenus[cat]?.note || "" };
+    for (const [listKey, { quoted }] of Object.entries(lists)) {
+      cleaned[cat][listKey] = (orderMenus[cat]?.[listKey] || [])
+        .filter((item) => item.name && item.name.trim())
+        .map((item) =>
+          quoted
+            ? { id: item.id, name: item.name.trim(), description: (item.description || "").trim(), quoted: true }
+            : {
+                id: item.id,
+                name: item.name.trim(),
+                description: (item.description || "").trim(),
+                price_cents: item.price_cents || 0,
+                per_guest: !!item.per_guest,
+                ...(item.image_url && item.image_url.trim() ? { image_url: item.image_url.trim() } : {}),
+              }
+        );
+    }
+  }
+
+  try {
+    await api("/api/admin/order-menus", { method: "PUT", body: JSON.stringify({ order_menus: cleaned }) });
+    orderMenus = cleaned;
+    renderOrderMenus();
+    showMsg(msgEl, "success", "Menus saved.");
+  } catch (err) {
+    showMsg(msgEl, "error", err.message);
   }
 }
