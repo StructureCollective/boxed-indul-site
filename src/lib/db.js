@@ -84,11 +84,11 @@ export async function listBlockedDatesInRange(env, startDate, endDate) {
   return results;
 }
 
-export async function findBookingByStripeSession(env, sessionId) {
+export async function findBookingByPaymentIntent(env, paymentIntentId) {
   return env.DB.prepare(
-    "SELECT * FROM bookings WHERE stripe_checkout_session_id = ?"
+    "SELECT * FROM bookings WHERE stripe_payment_intent_id = ?"
   )
-    .bind(sessionId)
+    .bind(paymentIntentId)
     .first();
 }
 
@@ -240,11 +240,11 @@ export async function getLunchSaleOrder(env, id) {
   return env.DB.prepare("SELECT * FROM lunch_sale_orders WHERE id = ?").bind(id).first();
 }
 
-export async function findLunchSaleOrderByStripeSession(env, sessionId) {
+export async function findLunchSaleOrderByPaymentIntent(env, paymentIntentId) {
   return env.DB.prepare(
-    "SELECT * FROM lunch_sale_orders WHERE stripe_checkout_session_id = ?"
+    "SELECT * FROM lunch_sale_orders WHERE stripe_payment_intent_id = ?"
   )
-    .bind(sessionId)
+    .bind(paymentIntentId)
     .first();
 }
 

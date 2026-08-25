@@ -1,10 +1,45 @@
 // Lunch Sale order/signup page. Shows the live lunch_sale_events entry with
-// a qty + drop-off order form (full payment at Stripe Checkout), or a
-// "no upcoming sale" placeholder with a notify-me signup form.
+// a qty + drop-off order form, then an embedded Stripe Payment Element +
+// Express Checkout Element (Apple Pay/Google Pay/Link) right on this page
+// for full payment — or a "no upcoming sale" placeholder with a notify-me
+// signup form when nothing's live.
 
 let currentEvent = null;
+let stripe = null;
+let elements = null;
+let checkoutEmail = "";
+let currentOrderId = null;
 
-document.addEventListener("DOMContentLoaded", loadEvent);
+const BRAND_APPEARANCE = {
+  theme: "stripe",
+  variables: {
+    colorPrimary: "#b6862f",
+    colorBackground: "#ffffff",
+    colorText: "#201c14",
+    colorDanger: "#7a2e2e",
+    fontFamily: "'Work Sans', sans-serif",
+    borderRadius: "6px",
+  },
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("paid") === "1") {
+    showBanner("success", "Payment received! Check your email for confirmation and drop-off details.");
+  } else if (params.get("canceled") === "1") {
+    showBanner("error", "Payment was canceled — no charge was made.");
+  }
+  loadEvent();
+});
+
+function showBanner(type, text) {
+  const area = document.getElementById("lunchSaleArea");
+  const banner = document.createElement("div");
+  banner.className = `form-msg show ${type}`;
+  banner.style.marginBottom = "20px";
+  banner.textContent = text;
+  area.parentNode.insertBefore(banner, area);
+}
 
 async function loadEvent() {
   const area = document.getElementById("lunchSaleArea");
@@ -102,53 +137,71 @@ function renderOrderForm(area, event) {
           ? `<p style="margin:0;">${
               soldOut ? "This lunch sale is sold out." : "Ordering has closed for this lunch sale."
             } Check back for the next one.</p>`
-          : `<form class="form-card" id="orderForm" style="text-align:left;padding:0;border:none;">
-        <div class="field">
-          <label for="dropoff_choice">Drop-off</label>
-          <select id="dropoff_choice" name="dropoff_choice" required>
-            <option value="">Select a drop-off time &amp; location</option>
-            ${dropoffs
-              .map((d) => {
-                const val = `${d.time} — ${d.location}`;
-                return `<option value="${escapeHtml(val)}">${escapeHtml(val)}</option>`;
-              })
-              .join("")}
-          </select>
-        </div>
-
-        <div class="field">
-          <label>Quantity</label>
-          <div class="qty-row">
-            <button type="button" id="qtyMinus">−</button>
-            <input type="number" id="quantity" min="1" max="${event.max_qty_per_order || 10}" value="1">
-            <button type="button" id="qtyPlus">+</button>
-          </div>
-        </div>
-
-        <div class="field-row">
+          : `<div id="orderStep">
+        <form class="form-card" id="orderForm" style="text-align:left;padding:0;border:none;">
           <div class="field">
-            <label for="name">Full name</label>
-            <input type="text" id="name" name="name" required>
+            <label for="dropoff_choice">Drop-off</label>
+            <select id="dropoff_choice" name="dropoff_choice" required>
+              <option value="">Select a drop-off time &amp; location</option>
+              ${dropoffs
+                .map((d) => {
+                  const val = `${d.time} — ${d.location}`;
+                  return `<option value="${escapeHtml(val)}">${escapeHtml(val)}</option>`;
+                })
+                .join("")}
+            </select>
           </div>
+
           <div class="field">
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" required>
+            <label>Quantity</label>
+            <div class="qty-row">
+              <button type="button" id="qtyMinus">−</button>
+              <input type="number" id="quantity" min="1" max="${event.max_qty_per_order || 10}" value="1">
+              <button type="button" id="qtyPlus">+</button>
+            </div>
           </div>
-        </div>
 
-        <div class="field">
-          <label for="phone">Phone</label>
-          <input type="tel" id="phone" name="phone">
-        </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="name">Full name</label>
+              <input type="text" id="name" name="name" required>
+            </div>
+            <div class="field">
+              <label for="email">Email</label>
+              <input type="email" id="email" name="email" required>
+            </div>
+          </div>
 
-        <div class="order-summary" id="lunchOrderSummary" style="display:block;">
-          <div class="total">Total due now<span id="lunchTotal">$${(event.price_cents / 100).toFixed(2)}</span></div>
-        </div>
+          <div class="field">
+            <label for="phone">Phone</label>
+            <input type="tel" id="phone" name="phone">
+          </div>
 
-        <button type="submit" class="btn btn-primary" id="orderBtn" style="width:100%;justify-content:center;">Order Now</button>
-        <p class="form-note">Full payment is collected securely by Stripe on the next step.</p>
-        <div class="form-msg" id="orderMsg"></div>
-      </form>`
+          <div class="order-summary" id="lunchOrderSummary" style="display:block;">
+            <div class="total">Total due now<span id="lunchTotal">$${(event.price_cents / 100).toFixed(
+              2
+            )}</span></div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="orderBtn" style="width:100%;justify-content:center;">Continue to Payment</button>
+          <div class="form-msg" id="orderMsg"></div>
+        </form>
+      </div>
+      <div id="paymentStep" style="display:none;">
+        <div class="order-summary" id="lunchPaymentSummary" style="display:block;"></div>
+        <div id="lunchStripeLoading" class="stripe-loading">Loading secure payment…</div>
+        <div id="lunchExpressCheckoutElement"></div>
+        <div class="stripe-divider" id="lunchStripeDivider" style="display:none;"><span>Or pay with card</span></div>
+        <form id="lunchPaymentForm" style="display:none;">
+          <div class="field" style="margin-bottom:12px;">
+            <label for="lunchLinkAuthenticationElement">Email</label>
+            <div id="lunchLinkAuthenticationElement"></div>
+          </div>
+          <div id="lunchPaymentElement" style="margin-bottom:20px;"></div>
+          <button type="submit" class="btn btn-primary" id="lunchPayBtn" style="width:100%;justify-content:center;">Pay Now</button>
+          <div class="form-msg" id="lunchPaymentMessage"></div>
+        </form>
+      </div>`
       }
     </div>`;
 
@@ -194,7 +247,7 @@ async function onOrderSubmit(e, event) {
   }
 
   btn.disabled = true;
-  btn.textContent = "Redirecting to secure payment…";
+  btn.textContent = "Starting Checkout…";
 
   try {
     const res = await fetch(`/api/lunch-sale/${event.id}/order`, {
@@ -206,15 +259,93 @@ async function onOrderSubmit(e, event) {
     if (!res.ok) {
       showMsg(msgEl, "error", data.error || "Something went wrong — please try again.");
       btn.disabled = false;
-      btn.textContent = "Order Now";
+      btn.textContent = "Continue to Payment";
       return;
     }
-    window.location.href = data.checkout_url;
+
+    currentOrderId = data.order_id;
+    checkoutEmail = payload.email;
+
+    document.getElementById("lunchPaymentSummary").innerHTML = `
+      <div class="line">${escapeHtml(payload.name)} — ${escapeHtml(String(payload.quantity))} lunch(es)</div>
+      <div class="total">Total due now<span>$${(data.amount / 100).toFixed(2)}</span></div>`;
+
+    document.getElementById("orderStep").style.display = "none";
+    document.getElementById("paymentStep").style.display = "block";
+
+    await initStripe(data);
   } catch (err) {
     console.error(err);
     showMsg(msgEl, "error", "Network error — please try again.");
     btn.disabled = false;
-    btn.textContent = "Order Now";
+    btn.textContent = "Continue to Payment";
+  }
+}
+
+async function initStripe(data) {
+  const loadingEl = document.getElementById("lunchStripeLoading");
+  try {
+    stripe = Stripe(data.publishable_key);
+    elements = stripe.elements({ clientSecret: data.client_secret, appearance: BRAND_APPEARANCE });
+
+    const expressCheckoutElement = elements.create("expressCheckout");
+    expressCheckoutElement.mount("#lunchExpressCheckoutElement");
+    expressCheckoutElement.on("ready", ({ availablePaymentMethods }) => {
+      if (availablePaymentMethods) document.getElementById("lunchStripeDivider").style.display = "flex";
+    });
+    expressCheckoutElement.on("confirm", () => confirmLunchPayment());
+
+    const linkAuthEl = elements.create("linkAuthentication", {
+      defaultValues: { email: checkoutEmail },
+    });
+    linkAuthEl.mount("#lunchLinkAuthenticationElement");
+    linkAuthEl.on("change", (e) => {
+      checkoutEmail = e.value.email;
+    });
+
+    const paymentElement = elements.create("payment");
+    paymentElement.mount("#lunchPaymentElement");
+
+    loadingEl.style.display = "none";
+    document.getElementById("lunchPaymentForm").style.display = "block";
+    document.getElementById("lunchPaymentForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      confirmLunchPayment();
+    });
+  } catch (err) {
+    console.error(err);
+    loadingEl.textContent = "Could not start payment — please refresh and try again.";
+  }
+}
+
+async function confirmLunchPayment() {
+  const btn = document.getElementById("lunchPayBtn");
+  const msgEl = document.getElementById("lunchPaymentMessage");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Processing…";
+  }
+
+  const { error, paymentIntent } = await stripe.confirmPayment({
+    elements,
+    confirmParams: {
+      return_url: `${window.location.origin}/lunch-sale/?paid=1&order=${currentOrderId}`,
+      receipt_email: checkoutEmail || undefined,
+    },
+    redirect: "if_required",
+  });
+
+  if (error) {
+    showMsg(msgEl, "error", error.message || "Payment failed — please try again.");
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Pay Now";
+    }
+    return;
+  }
+
+  if (paymentIntent && ["succeeded", "processing"].includes(paymentIntent.status)) {
+    window.location.href = `/lunch-sale/?paid=1&order=${currentOrderId}`;
   }
 }
 

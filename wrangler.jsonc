@@ -22,7 +22,7 @@
     {
       "binding": "DB",
       "database_name": "boxed-indulgence-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+      "database_id": "aecd26a1-6fc5-4a9e-8c4a-14f81604dc30"
     }
   ],
 
@@ -55,12 +55,18 @@
     "GOOGLE_CLIENT_ID": "414049872483-8tcdg0edkb73fvfn98r9afvs0d5hk9a7.apps.googleusercontent.com",
     "GOOGLE_REDIRECT_URI": "https://boxedindulgence.com/api/admin/google/callback",
 
+    // Stripe's publishable key (pk_test_... or pk_live_...) is safe to keep
+    // in plain vars — it's meant to be embedded in client-side JS, unlike
+    // STRIPE_SECRET_KEY. The Worker hands this to the browser so it can
+    // initialize Stripe.js and mount the Payment/Express Checkout Elements.
+    "STRIPE_PUBLISHABLE_KEY": "pk_test_51U84bQBtHxFYbPJj2MA95W0bUUPhRpRAjKpY3qCFuiKSgUdmrVuu2512IpruHl4zTNn16txUcWtHFz8uWAAWQOek007MLRfkXq",
+
     // From the Access application's Overview tab once it's created in the
     // Cloudflare Zero Trust dashboard (Access > Applications). Needed so
     // the Worker can verify the Cf-Access-Jwt-Assertion header itself.
     // See README.md "Setting up Cloudflare Access" for exact steps.
-    "CF_ACCESS_TEAM_DOMAIN": "REPLACE_WITH_YOUR_TEAM.cloudflareaccess.com",
-    "CF_ACCESS_AUD": "REPLACE_WITH_YOUR_ACCESS_APPLICATION_AUD_TAG",
+    "CF_ACCESS_TEAM_DOMAIN": "structurecollective.cloudflareaccess.com",
+    "CF_ACCESS_AUD": "90d45ad006367af2c0aec93b1a85ba3f1372f64d2187ed5fdb283524db81da01",
 
     "SITE_URL": "https://boxedindulgence.com"
   },

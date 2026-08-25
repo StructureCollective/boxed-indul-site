@@ -17,7 +17,7 @@ import {
   listBlockedDatesInRange,
   insertContactMessage,
   listAllContactMessages,
-  findBookingByStripeSession,
+  findBookingByPaymentIntent,
   insertLunchSaleEvent,
   updateLunchSaleEvent,
   getLunchSaleEvent,
@@ -26,7 +26,7 @@ import {
   insertLunchSaleOrder,
   updateLunchSaleOrderStatus,
   getLunchSaleOrder,
-  findLunchSaleOrderByStripeSession,
+  findLunchSaleOrderByPaymentIntent,
   countActiveLunchSaleOrders,
   listAllLunchSaleOrders,
   insertLunchSaleSignup,
@@ -49,8 +49,9 @@ import {
   lunchSaleNowLiveEmail,
 } from "./lib/email.js";
 import {
-  createDepositCheckoutSession,
-  createLunchSaleCheckoutSession,
+  createDepositPaymentIntent,
+  createLunchSalePaymentIntent,
+  retrievePaymentIntent,
   verifyStripeWebhook,
 } from "./lib/stripe.js";
 import { priceOrder } from "./lib/menu-data.js";
@@ -92,10 +93,10 @@ export default {
         return handleBookingCheckoutInfo(env, pathname);
       }
       if (
-        pathname.match(/^\/api\/booking\/[^/]+\/checkout-session$/) &&
+        pathname.match(/^\/api\/booking\/[^/]+\/payment-intent$/) &&
         request.method === "POST"
       ) {
-        return handleCreateDepositCheckoutSession(env, pathname);
+        return handleCreateDepositPaymentIntent(env, pathname);
       }
       if (pathname === "/api/contact" && request.method === "POST") {
         return handleContact(request, env);
@@ -396,6 +397,7 @@ async function handleBookingCheckoutInfo(env, pathname) {
   return json({
     id: booking.id,
     name: booking.name,
+    email: booking.email,
     event_date: booking.event_date,
     guest_count: booking.guest_count,
     order_total_cents: booking.order_total_cents,
@@ -406,7 +408,12 @@ async function handleBookingCheckoutInfo(env, pathname) {
   });
 }
 
-async function handleCreateDepositCheckoutSession(env, pathname) {
+// Creates (or reuses) the PaymentIntent backing the embedded Payment Element
+// + Express Checkout Element on /booking/checkout/. Reused across page
+// reloads so a customer bouncing off and back doesn't rack up abandoned
+// PaymentIntents; recreated if the prior one is no longer usable (canceled,
+// already succeeded) or the amount changed (e.g. admin edited the total).
+async function handleCreateDepositPaymentIntent(env, pathname) {
   const id = pathname.split("/")[3];
   const booking = await getBooking(env, id);
   if (!booking) return json({ error: "Not found" }, 404);
@@ -423,11 +430,27 @@ async function handleCreateDepositCheckoutSession(env, pathname) {
     );
   }
 
-  const session = await createDepositCheckoutSession(env, booking);
-  await updateBookingStatus(env, id, "approved", {
-    stripe_checkout_session_id: session.id,
+  let intent = booking.stripe_payment_intent_id
+    ? await retrievePaymentIntent(env, booking.stripe_payment_intent_id).catch(() => null)
+    : null;
+  const needsNew =
+    !intent ||
+    ["canceled", "succeeded"].includes(intent.status) ||
+    intent.amount !== booking.deposit_amount_cents;
+
+  if (needsNew) {
+    intent = await createDepositPaymentIntent(env, booking);
+    await updateBookingStatus(env, id, "approved", {
+      stripe_payment_intent_id: intent.id,
+    });
+  }
+
+  return json({
+    client_secret: intent.client_secret,
+    publishable_key: env.STRIPE_PUBLISHABLE_KEY,
+    amount: booking.deposit_amount_cents,
+    currency: env.DEPOSIT_CURRENCY || "usd",
   });
-  return json({ checkout_url: session.url });
 }
 
 // ---- contact form ----------------------------------------------------
@@ -521,9 +544,9 @@ async function handleCreateLunchSaleOrder(request, env, pathname) {
   };
   await insertLunchSaleOrder(env, order);
 
-  const session = await createLunchSaleCheckoutSession(env, order, event);
+  const intent = await createLunchSalePaymentIntent(env, order, event);
   await updateLunchSaleOrderStatus(env, order.id, "pending_payment", {
-    stripe_checkout_session_id: session.id,
+    stripe_payment_intent_id: intent.id,
   });
 
   await sendEmail(env, {
@@ -533,7 +556,14 @@ async function handleCreateLunchSaleOrder(request, env, pathname) {
     replyTo: email,
   });
 
-  return json({ ok: true, checkout_url: session.url });
+  return json({
+    ok: true,
+    order_id: order.id,
+    client_secret: intent.client_secret,
+    publishable_key: env.STRIPE_PUBLISHABLE_KEY,
+    amount: order.total_cents,
+    currency: env.DEPOSIT_CURRENCY || "usd",
+  });
 }
 
 async function handleLunchSaleSignup(request, env) {
@@ -723,30 +753,40 @@ async function handleStripeWebhook(request, env) {
 
   const event = JSON.parse(payloadText);
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    const kind = session.metadata?.kind;
+  // The embedded Payment/Express Checkout Element flow confirms a
+  // PaymentIntent directly (no Checkout Session involved), so that's the
+  // event we listen for — configure this in the Stripe webhook endpoint's
+  // event list.
+  if (event.type === "payment_intent.succeeded") {
+    const intent = event.data.object;
+    const kind = intent.metadata?.kind;
 
     if (kind === "lunch_sale") {
-      await handleLunchSalePaid(env, session);
-    } else {
-      await handleDepositPaid(env, session);
+      await handleLunchSalePaid(env, intent);
+    } else if (kind === "deposit") {
+      await handleDepositPaid(env, intent);
     }
   }
 
   return json({ received: true });
 }
 
-async function handleDepositPaid(env, session) {
-  const bookingId = session.client_reference_id;
+async function handleDepositPaid(env, intent) {
+  const bookingId = intent.metadata?.booking_id;
   const booking = bookingId
     ? await getBooking(env, bookingId)
-    : await findBookingByStripeSession(env, session.id);
+    : await findBookingByPaymentIntent(env, intent.id);
   if (!booking || booking.status === "confirmed") return;
 
-  await updateBookingStatus(env, booking.id, "confirmed", {
-    stripe_payment_status: "paid",
-  });
+  // The Link Authentication Element on the checkout page lets the customer
+  // confirm/correct their email right at payment time — trust that over
+  // whatever was typed into the original request form, since it's what
+  // Stripe's own receipt (and our confirmation email) actually went to.
+  const extra = { stripe_payment_status: "paid" };
+  if (intent.receipt_email && intent.receipt_email !== booking.email) {
+    extra.email = intent.receipt_email;
+  }
+  await updateBookingStatus(env, booking.id, "confirmed", extra);
   const confirmed = await getBooking(env, booking.id);
 
   const calendarEventId = await pushBookingToCalendar(env, confirmed).catch((err) => {
@@ -771,14 +811,18 @@ async function handleDepositPaid(env, session) {
   });
 }
 
-async function handleLunchSalePaid(env, session) {
-  const orderId = session.metadata?.lunch_sale_order_id || session.client_reference_id;
+async function handleLunchSalePaid(env, intent) {
+  const orderId = intent.metadata?.lunch_sale_order_id;
   const order = orderId
     ? await getLunchSaleOrder(env, orderId)
-    : await findLunchSaleOrderByStripeSession(env, session.id);
+    : await findLunchSaleOrderByPaymentIntent(env, intent.id);
   if (!order || order.status === "paid") return;
 
-  await updateLunchSaleOrderStatus(env, order.id, "paid", { stripe_payment_status: "paid" });
+  const extra = { stripe_payment_status: "paid" };
+  if (intent.receipt_email && intent.receipt_email !== order.email) {
+    extra.email = intent.receipt_email;
+  }
+  await updateLunchSaleOrderStatus(env, order.id, "paid", extra);
   const event = await getLunchSaleEvent(env, order.event_id);
   const paidOrder = await getLunchSaleOrder(env, order.id);
 

@@ -1,9 +1,26 @@
-// Real deposit checkout bridge page. This page itself stays valid for the
-// full DEPOSIT_LINK_EXPIRY_HOURS window (see README) — the actual Stripe
-// Checkout Session is only created the moment the customer clicks "Pay",
-// since Stripe sessions themselves cap out at 24h.
+// Deposit checkout — embedded Stripe Payment Element + Express Checkout
+// Element (Apple Pay / Google Pay / Link), right on this page. This page
+// itself stays valid for the full DEPOSIT_LINK_EXPIRY_HOURS window (see
+// README) — the PaymentIntent backing the Elements is only created the
+// moment this page loads (and reused on reload), since a PaymentIntent
+// isn't meant to sit around unused for days the way our own link is.
 
 let currentBooking = null;
+let stripe = null;
+let elements = null;
+let checkoutEmail = "";
+
+const BRAND_APPEARANCE = {
+  theme: "stripe",
+  variables: {
+    colorPrimary: "#b6862f",
+    colorBackground: "#ffffff",
+    colorText: "#201c14",
+    colorDanger: "#7a2e2e",
+    fontFamily: "'Work Sans', sans-serif",
+    borderRadius: "6px",
+  },
+};
 
 document.addEventListener("DOMContentLoaded", async () => {
   const params = new URLSearchParams(window.location.search);
@@ -58,36 +75,91 @@ document.addEventListener("DOMContentLoaded", async () => {
   const params2 = new URLSearchParams(window.location.search);
   if (params2.get("canceled") === "1") {
     document.getElementById("payNote").textContent =
-      "Payment was canceled — no charge was made. Click below whenever you're ready.";
+      "Payment was canceled — no charge was made. You can try again below whenever you're ready.";
   }
 
   payCard.style.display = "block";
-  document.getElementById("payBtn").addEventListener("click", onPay);
+  await initStripe(id);
 });
 
-async function onPay() {
-  const btn = document.getElementById("payBtn");
-  btn.disabled = true;
-  btn.textContent = "Redirecting to secure payment…";
-
+async function initStripe(bookingId) {
+  const loadingEl = document.getElementById("stripeLoading");
   try {
-    const res = await fetch(`/api/booking/${currentBooking.id}/checkout-session`, {
-      method: "POST",
-    });
+    const res = await fetch(`/api/booking/${bookingId}/payment-intent`, { method: "POST" });
     const data = await res.json();
     if (!res.ok) {
-      alert(data.error || "Something went wrong — please try again.");
-      btn.disabled = false;
-      btn.textContent = "Pay Deposit Securely";
+      loadingEl.textContent = data.error || "Could not start payment — please refresh and try again.";
       return;
     }
-    window.location.href = data.checkout_url;
+
+    stripe = Stripe(data.publishable_key);
+    checkoutEmail = currentBooking.email || "";
+    elements = stripe.elements({ clientSecret: data.client_secret, appearance: BRAND_APPEARANCE });
+
+    const expressCheckoutElement = elements.create("expressCheckout");
+    expressCheckoutElement.mount("#expressCheckoutElement");
+    expressCheckoutElement.on("ready", ({ availablePaymentMethods }) => {
+      if (availablePaymentMethods) document.getElementById("stripeDivider").style.display = "flex";
+    });
+    expressCheckoutElement.on("confirm", () => confirmPayment(bookingId));
+
+    const linkAuthEl = elements.create("linkAuthentication", {
+      defaultValues: { email: checkoutEmail },
+    });
+    linkAuthEl.mount("#linkAuthenticationElement");
+    linkAuthEl.on("change", (e) => {
+      checkoutEmail = e.value.email;
+    });
+
+    const paymentElement = elements.create("payment");
+    paymentElement.mount("#paymentElement");
+
+    loadingEl.style.display = "none";
+    document.getElementById("paymentForm").style.display = "block";
+    document.getElementById("paymentForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      confirmPayment(bookingId);
+    });
   } catch (err) {
     console.error(err);
-    alert("Network error — please try again.");
-    btn.disabled = false;
-    btn.textContent = "Pay Deposit Securely";
+    loadingEl.textContent = "Could not start payment — please refresh and try again.";
   }
+}
+
+async function confirmPayment(bookingId) {
+  const btn = document.getElementById("payBtn");
+  const msgEl = document.getElementById("paymentMessage");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Processing…";
+  }
+
+  const { error, paymentIntent } = await stripe.confirmPayment({
+    elements,
+    confirmParams: {
+      return_url: `${window.location.origin}/booking/?paid=1&booking=${bookingId}`,
+      receipt_email: checkoutEmail || undefined,
+    },
+    redirect: "if_required",
+  });
+
+  if (error) {
+    showMsg(msgEl, "error", error.message || "Payment failed — please try again.");
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Pay Deposit Securely";
+    }
+    return;
+  }
+
+  if (paymentIntent && ["succeeded", "processing"].includes(paymentIntent.status)) {
+    window.location.href = `/booking/?paid=1&booking=${bookingId}`;
+  }
+}
+
+function showMsg(el, type, text) {
+  el.className = `form-msg show ${type}`;
+  el.textContent = text;
 }
 
 function formatDate(dateStr) {

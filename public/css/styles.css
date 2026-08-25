@@ -456,6 +456,28 @@ section.dark p { color: #c9c0ac; }
 .order-summary .deposit-note { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
 
 /* ============================================================
+   Stripe Elements — Express Checkout + Payment Element
+   ============================================================ */
+.stripe-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.stripe-divider::before, .stripe-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+#expressCheckoutElement, #lunchExpressCheckoutElement { min-height: 0; }
+.stripe-loading { text-align: center; color: var(--muted); font-size: 0.85rem; padding: 12px 0; }
+
+/* ============================================================
    Admin searchable tables
    ============================================================ */
 .admin-search { max-width: 340px; margin-bottom: 16px; }

@@ -29,9 +29,23 @@
       <p id="summaryText">Loading your order…</p>
     </div>
 
-    <div class="form-card" id="payCard" style="display:none;text-align:center;">
+    <div class="form-card" id="payCard" style="display:none;">
       <div class="order-summary" id="orderSummary" style="display:block;"></div>
-      <button class="btn btn-primary" id="payBtn" style="width:100%;justify-content:center;">Pay Deposit Securely</button>
+
+      <div id="stripeLoading" class="stripe-loading">Loading secure payment…</div>
+
+      <div id="expressCheckoutElement"></div>
+      <div class="stripe-divider" id="stripeDivider" style="display:none;"><span>Or pay with card</span></div>
+
+      <form id="paymentForm" style="display:none;">
+        <div class="field" style="margin-bottom:12px;">
+          <label for="linkAuthenticationElement">Email</label>
+          <div id="linkAuthenticationElement"></div>
+        </div>
+        <div id="paymentElement" style="margin-bottom:20px;"></div>
+        <button type="submit" class="btn btn-primary" id="payBtn" style="width:100%;justify-content:center;">Pay Deposit Securely</button>
+        <div class="form-msg" id="paymentMessage"></div>
+      </form>
       <p class="form-note" id="payNote"></p>
     </div>
 
@@ -58,6 +72,7 @@
 </footer>
 
 <script src="/js/main.js"></script>
+<script src="https://js.stripe.com/v3/"></script>
 <script src="/js/checkout.js"></script>
 </body>
 </html>

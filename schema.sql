@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   deposit_percent INTEGER,                  -- e.g. 25 = 25% of order_total_cents
   deposit_amount_cents INTEGER,
   deposit_link_expires_at TEXT,             -- ISO timestamp; app-enforced (Stripe caps at 24h)
-  stripe_checkout_session_id TEXT,
+  stripe_checkout_session_id TEXT,          -- unused (legacy hosted-Checkout flow)
+  stripe_payment_intent_id TEXT,            -- embedded Payment/Express Checkout Element flow
   stripe_payment_status TEXT DEFAULT 'unpaid',
   google_calendar_event_id TEXT,            -- set once pushed to the connected calendar
   created_at TEXT NOT NULL,
@@ -95,7 +96,8 @@ CREATE TABLE IF NOT EXISTS lunch_sale_orders (
   total_cents INTEGER NOT NULL,              -- quantity * price_cents at time of order
   status TEXT NOT NULL DEFAULT 'pending_payment',
     -- pending_payment | paid | canceled | expired
-  stripe_checkout_session_id TEXT,
+  stripe_checkout_session_id TEXT,          -- unused (legacy hosted-Checkout flow)
+  stripe_payment_intent_id TEXT,            -- embedded Payment/Express Checkout Element flow
   stripe_payment_status TEXT DEFAULT 'unpaid',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL

@@ -36,6 +36,11 @@ npm run db:init:remote
 Either way, paste the resulting `database_id` into `wrangler.jsonc` under
 `d1_databases[0].database_id`, replacing `REPLACE_WITH_YOUR_D1_DATABASE_ID`.
 
+If your database already existed before the embedded Stripe Elements
+checkout was added, run `migration-payment-intents.sql` in the D1 Console
+too — it just adds the two `stripe_payment_intent_id` columns `schema.sql`
+now includes by default, so applying it twice is harmless.
+
 ### 2. Set up Cloudflare Access (Zero Trust) for `/admin/*`
 
 This is what replaces the old admin passcode with a real sign-in — only the
@@ -62,8 +67,9 @@ two approved emails will be able to reach `/admin/`.
 5. Save. Cloudflare will now show a login page (email + one-time PIN, unless
    you also set up Google/other identity providers) to anyone visiting
    `/admin/*` who isn't one of those two emails.
-6. Open the application you just created and go to its **Overview** tab.
-   Copy the **Application Audience (AUD) Tag** shown there.
+6. Open the application you just created → **Additional settings** tab →
+   **AUD tag** sub-tab. Copy the **Application Audience (AUD) Tag** token
+   shown there.
 7. Fill these into `wrangler.jsonc` under `vars`:
    - `CF_ACCESS_TEAM_DOMAIN` → `<your-team-name>.cloudflareaccess.com`
    - `CF_ACCESS_AUD` → the AUD tag from step 6
@@ -84,12 +90,28 @@ npx wrangler secret put GOOGLE_CLIENT_SECRET     # from Google Cloud Console OAu
 ```
 There's no `ADMIN_KEY` anymore — Cloudflare Access replaced it entirely.
 
+Also fill in the (non-secret) `STRIPE_PUBLISHABLE_KEY` var in
+`wrangler.jsonc` — Stripe dashboard → Developers → API keys → Publishable
+key (`pk_test_...` or `pk_live_...`). This is safe to keep in plain vars
+since it's meant to be embedded in the browser; only the secret key needs
+`wrangler secret put`.
+
 ### 4. Set up the Stripe webhook
+
+Both checkout flows are embedded directly on the site with Stripe's Payment
+Element + Express Checkout Element (Apple Pay / Google Pay / Link) — nothing
+redirects to a Stripe-hosted page. That means the webhook listens for a
+PaymentIntent event, not a Checkout Session one.
 
 Stripe dashboard → Developers → Webhooks → Add endpoint →
 `https://boxedindulgence.com/api/stripe/webhook`, listening for
-`checkout.session.completed`. Copy the signing secret into
+**`payment_intent.succeeded`**. Copy the signing secret into
 `STRIPE_WEBHOOK_SECRET` (step 3).
+
+If you want Apple Pay to show up in the Express Checkout Element, Stripe
+also requires verifying the domain: Stripe dashboard → Settings → Payment
+methods → Apple Pay → Add a new domain → `boxedindulgence.com`. Google Pay
+and Link don't need this step.
 
 ### 5. Connect Google Calendar
 
@@ -133,20 +155,26 @@ file.
 to customer → admin approves (optionally overriding the total for
 quoted/custom items) on `/admin/` → time-limited (72h, configurable via
 `DEPOSIT_LINK_EXPIRY_HOURS`) deposit link emailed to the customer →
-`/booking/checkout/` creates a fresh Stripe Checkout Session only at the
-moment the customer clicks Pay → webhook confirms the booking, pushes it to
-Google Calendar, and emails both sides.
+`/booking/checkout/` creates a PaymentIntent the moment the page loads and
+mounts Stripe's Express Checkout Element (Apple Pay/Google Pay/Link) and
+Payment Element (card) directly on the page — nothing redirects to Stripe.
+A Link Authentication Element lets the customer confirm/correct their email
+right at payment time; that's the address the confirmation email and
+Stripe's own receipt go to. The `payment_intent.succeeded` webhook confirms
+the booking, pushes it to Google Calendar, and emails both sides.
 
 ### Lunch Sale flow
 
 Admin posts a lunch-sale event from `/admin/` → **Lunch Sale** tab (menu,
 price, drop-off time(s)/location(s), sale date, order cutoff, slot cap, max
 qty per order) and sets it **Live**. It then shows on the homepage and at
-`/lunch-sale/` with a live slots-remaining count. Customers order (quantity +
-drop-off choice), pay in full at Stripe Checkout, and the order lands in the
-searchable **Orders** table on `/admin/`. When no sale is live, the homepage
-shows a placeholder and `/lunch-sale/` offers an email signup — admins can
-notify everyone on that list with one click once a new sale goes live.
+`/lunch-sale/` with a live slots-remaining count. Customers pick a quantity
+and drop-off choice, then pay in full through the same embedded Express
+Checkout Element + Payment Element flow as the deposit checkout — and the
+order lands in the searchable **Orders** table on `/admin/`. When no sale is
+live, the homepage shows a placeholder and `/lunch-sale/` offers an email
+signup — admins can notify everyone on that list with one click once a new
+sale goes live.
 
 ## Editing seasonal content
 
@@ -203,5 +231,6 @@ public/img/                       Logo, wordmark, hero photo, chef avatar — re
 src/                               The Worker (routes, D1 queries, Stripe, email, Access, Calendar)
 going-live-reference/             Historical snapshot from sandbox mode — safe to delete
 schema.sql                        D1 database schema
+migration-payment-intents.sql     Adds stripe_payment_intent_id columns to an already-created D1 database
 wrangler.jsonc                    Cloudflare config (Worker + D1 + vars)
 ```
