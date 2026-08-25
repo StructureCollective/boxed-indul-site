@@ -27,6 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
   wireAdminCalendar();
   wireOccasions();
   wireMenus();
+  wireDashboard();
 
   loadBookings();
   loadContacts();
@@ -1002,8 +1003,36 @@ function renderDashboard() {
   renderDashboardOrders();
 }
 
+function wireDashboard() {
+  document.getElementById("dashOrdersRange")?.addEventListener("change", renderDashboardOrders);
+}
+
 function switchAdminTab(panelId) {
   document.querySelector(`.admin-tabs button[data-panel="${panelId}"]`)?.click();
+}
+
+// Start-of-range cutoff for the Custom Orders Overview date filter, keyed
+// off each booking's created_at (when the request came in) — null means no
+// filter ("All Time"). Week/Month/Year are calendar-aligned (e.g. "This
+// Month" = since the 1st), 30days is a rolling window.
+function dashOrdersRangeStart(rangeKey) {
+  const now = new Date();
+  if (rangeKey === "week") {
+    const start = new Date(now);
+    start.setDate(start.getDate() - start.getDay());
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }
+  if (rangeKey === "month") {
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+  if (rangeKey === "30days") {
+    return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  }
+  if (rangeKey === "year") {
+    return new Date(now.getFullYear(), 0, 1);
+  }
+  return null; // "all"
 }
 
 function renderDashboardLunchSale() {
@@ -1051,9 +1080,13 @@ function renderDashboardOrders() {
   const el = document.getElementById("dashOrders");
   if (!el) return;
 
-  const pending = bookings.filter((b) => b.status === "pending_approval");
-  const awaiting = bookings.filter((b) => b.status === "approved");
-  const confirmed = bookings.filter((b) => b.status === "confirmed");
+  const rangeKey = document.getElementById("dashOrdersRange")?.value || "30days";
+  const start = dashOrdersRangeStart(rangeKey);
+  const inRange = start ? bookings.filter((b) => new Date(b.created_at) >= start) : bookings;
+
+  const pending = inRange.filter((b) => b.status === "pending_approval");
+  const awaiting = inRange.filter((b) => b.status === "approved");
+  const confirmed = inRange.filter((b) => b.status === "confirmed");
   const depositTotal = confirmed.reduce((sum, b) => sum + (b.deposit_amount_cents || 0), 0);
 
   const pendingList = pending
