@@ -66,15 +66,50 @@
   .row-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); display: block; margin-bottom: 3px; }
   .opt-thumb, .lunch-thumb { display: block; width: 100%; max-height: 140px; object-fit: cover; border-radius: 6px; margin-bottom: 8px; }
   .event-card .thumb { width: 100%; max-height: 160px; object-fit: cover; border-radius: 6px; margin-bottom: 10px; }
+  .menu-item-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .menu-item-list button.mi-row { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; border: none; border-bottom: 1px solid var(--line); background: none; cursor: pointer; font-size: 0.85rem; font-family: var(--font-body); text-align: left; }
+  .menu-item-list button.mi-row:last-child { border-bottom: none; }
+  .menu-item-list button.mi-row:hover { background: rgba(85,96,63,0.07); }
+  .menu-item-list .mi-name { font-weight: 600; color: var(--black); }
+  .menu-item-list .mi-price { color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+  .menu-item-list .mi-empty { padding: 14px; color: var(--muted); font-size: 0.85rem; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(20,18,13,0.55); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
+  .modal-card { background: var(--white); border-radius: var(--radius); padding: 24px; max-width: 480px; width: 100%; max-height: 88vh; overflow-y: auto; border-top: 4px solid var(--green); }
+  .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .modal-head h3 { margin: 0; }
+  .modal-close { background: none; border: none; font-size: 1.5rem; line-height: 1; cursor: pointer; color: var(--muted); padding: 0 4px; }
+  .modal-close:hover { color: var(--maroon); }
+
+  /* ---- admin theme: white + #55603F highlights, distinct from the public site's cream/rust look ---- */
+  body { background: var(--white); }
+  .admin-header { background: rgba(255,255,255,0.96); border-bottom: 3px solid var(--green); }
+  .admin-wrap .eyebrow { color: var(--green); }
+  .admin-tabs button.active { color: var(--green-dark); border-bottom-color: var(--green); }
+  .admin-topbar a.back:hover { color: var(--green-dark); }
+  .admin-card { border-top: 3px solid var(--green); }
+  .event-card { border-left: 3px solid var(--green); }
+  .admin-wrap .btn-primary { background: var(--green); }
+  .admin-wrap .btn-primary:hover { background: var(--green-dark); }
+  .admin-wrap .btn-outline:hover { border-color: var(--green); color: var(--green-dark); }
+  .admin-wrap input:focus, .admin-wrap select:focus, .admin-wrap textarea:focus { outline: none; border-color: var(--green); }
+
+  /* ---- dashboard ---- */
+  .dash-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 4px; }
+  .dash-stat { background: var(--cream-2); border-radius: 8px; padding: 14px 16px; text-align: center; }
+  .dash-stat .num { display: block; font-family: var(--font-display); font-size: 1.6rem; color: var(--green-dark); font-weight: 700; }
+  .dash-stat .label { display: block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin-top: 2px; }
+  .dash-list { list-style: none; margin: 8px 0 0; padding: 0; font-size: 0.85rem; }
+  .dash-list li { padding: 6px 0; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; }
+  .dash-list li:last-child { border-bottom: none; }
 </style>
 </head>
 <body>
 
-<header class="site-header">
+<header class="site-header admin-header">
   <div class="wrap">
     <a class="brand" href="/">
       <img src="/img/logo.png" alt="Boxed Indulgence logo">
-      <span>Boxed <em>Indulgence</em> <small style="color:var(--muted);font-size:0.7rem;">/ admin</small></span>
+      <span>Boxed <em>Indulgence</em> <small style="color:var(--green);font-size:0.7rem;font-weight:700;">/ admin</small></span>
     </a>
   </div>
 </header>
@@ -94,15 +129,28 @@
   <div id="globalMsg" class="form-msg" style="margin-bottom:20px;"></div>
 
   <div class="admin-tabs">
-    <button class="tab-btn active" data-panel="panel-bookings">Custom Orders</button>
+    <button class="tab-btn active" data-panel="panel-dashboard">Dashboard</button>
+    <button class="tab-btn" data-panel="panel-bookings">Custom Orders</button>
     <button class="tab-btn" data-panel="panel-lunch">Lunch Sale</button>
     <button class="tab-btn" data-panel="panel-menus">Menus</button>
     <button class="tab-btn" data-panel="panel-contacts">Contacts</button>
     <button class="tab-btn" data-panel="panel-calendar">Calendar &amp; Dates</button>
   </div>
 
+  <!-- ===================== Dashboard ===================== -->
+  <section class="admin-panel active" id="panel-dashboard">
+    <div class="admin-card">
+      <h3>Current Lunch Sale</h3>
+      <div id="dashLunchSale"><p class="subtle">Loading…</p></div>
+    </div>
+    <div class="admin-card">
+      <h3>Custom Orders Overview</h3>
+      <div id="dashOrders"><p class="subtle">Loading…</p></div>
+    </div>
+  </section>
+
   <!-- ===================== Custom Orders (bookings) ===================== -->
-  <section class="admin-panel active" id="panel-bookings">
+  <section class="admin-panel" id="panel-bookings">
     <div class="admin-toolbar">
       <div class="admin-search"><input type="text" id="bookingsSearch" placeholder="Search name, email, date…"></div>
       <button class="btn btn-outline" id="bookingsRefresh">Refresh</button>
@@ -238,7 +286,9 @@
     <div class="admin-card">
       <p class="subtle" id="menusLoadingMsg">Loading menus…</p>
       <div id="menuCategories" style="display:none;">
-        <div class="menu-category">
+        <p class="subtle" style="margin-bottom:20px;">Click any item below, use <strong>+ Add</strong>, or use <strong>Edit Existing Menu</strong> to open the editor. Changes here aren't saved until you click <strong>Save All Menus</strong> at the bottom.</p>
+
+        <div class="menu-category" data-category="boxed_lunch">
           <h3>Boxed Lunch</h3>
           <div class="field">
             <label for="note_boxed_lunch">Note shown to customers</label>
@@ -249,18 +299,19 @@
               <h4 style="margin:0;">Entrées</h4>
               <button type="button" class="btn btn-outline" data-add-item="boxed_lunch.entrees">+ Add Entrée</button>
             </div>
-            <div id="items_boxed_lunch_entrees" class="menu-item-rows"></div>
+            <div id="items_boxed_lunch_entrees" class="menu-item-list"></div>
           </div>
           <div class="menu-group">
             <div class="admin-toolbar" style="margin-bottom:10px;">
               <h4 style="margin:0;">Enhancements</h4>
               <button type="button" class="btn btn-outline" data-add-item="boxed_lunch.enhancements">+ Add Enhancement</button>
             </div>
-            <div id="items_boxed_lunch_enhancements" class="menu-item-rows"></div>
+            <div id="items_boxed_lunch_enhancements" class="menu-item-list"></div>
           </div>
+          <button type="button" class="btn btn-outline" data-edit-existing="boxed_lunch" style="margin-top:14px;">Edit Existing Menu</button>
         </div>
 
-        <div class="menu-category">
+        <div class="menu-category" data-category="charcuterie">
           <h3>Charcuterie Board</h3>
           <div class="field">
             <label for="note_charcuterie">Note shown to customers</label>
@@ -271,18 +322,19 @@
               <h4 style="margin:0;">Boards</h4>
               <button type="button" class="btn btn-outline" data-add-item="charcuterie.boards">+ Add Board</button>
             </div>
-            <div id="items_charcuterie_boards" class="menu-item-rows"></div>
+            <div id="items_charcuterie_boards" class="menu-item-list"></div>
           </div>
           <div class="menu-group">
             <div class="admin-toolbar" style="margin-bottom:10px;">
               <h4 style="margin:0;">Enhancements</h4>
               <button type="button" class="btn btn-outline" data-add-item="charcuterie.enhancements">+ Add Enhancement</button>
             </div>
-            <div id="items_charcuterie_enhancements" class="menu-item-rows"></div>
+            <div id="items_charcuterie_enhancements" class="menu-item-list"></div>
           </div>
+          <button type="button" class="btn btn-outline" data-edit-existing="charcuterie" style="margin-top:14px;">Edit Existing Menu</button>
         </div>
 
-        <div class="menu-category">
+        <div class="menu-category" data-category="custom_meal">
           <h3>Custom Boxed Meal</h3>
           <div class="field">
             <label for="note_custom_meal">Note shown to customers</label>
@@ -293,22 +345,67 @@
               <h4 style="margin:0;">Box Collections</h4>
               <button type="button" class="btn btn-outline" data-add-item="custom_meal.boxes">+ Add Box</button>
             </div>
-            <div id="items_custom_meal_boxes" class="menu-item-rows"></div>
+            <div id="items_custom_meal_boxes" class="menu-item-list"></div>
           </div>
           <div class="menu-group">
             <div class="admin-toolbar" style="margin-bottom:10px;">
               <h4 style="margin:0;">Personalization (priced by quote)</h4>
               <button type="button" class="btn btn-outline" data-add-item="custom_meal.personalization">+ Add Option</button>
             </div>
-            <div id="items_custom_meal_personalization" class="menu-item-rows"></div>
+            <div id="items_custom_meal_personalization" class="menu-item-list"></div>
           </div>
+          <button type="button" class="btn btn-outline" data-edit-existing="custom_meal" style="margin-top:14px;">Edit Existing Menu</button>
         </div>
 
-        <button class="btn btn-primary" id="menusSave" style="width:100%;justify-content:center;">Save All Menus</button>
+        <button class="btn btn-primary" id="menusSave" style="width:100%;justify-content:center;margin-top:6px;">Save All Menus</button>
         <div class="form-msg" id="menusMsg"></div>
       </div>
     </div>
   </section>
+
+  <!-- Shared popup for adding/editing one menu item, used by every category above -->
+  <div class="modal-overlay" id="menuItemModal" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="menuItemModalTitle">Menu Item</h3>
+        <button type="button" class="modal-close" id="menuItemModalClose" aria-label="Close">&times;</button>
+      </div>
+      <div class="field">
+        <label for="miSelect">Item</label>
+        <select id="miSelect"></select>
+      </div>
+      <div id="miFields" style="display:none;">
+        <div class="field">
+          <label for="mi_name">Name</label>
+          <input type="text" id="mi_name" placeholder="e.g. Signature Sandwich Box">
+        </div>
+        <div class="field">
+          <label for="mi_desc">Description</label>
+          <input type="text" id="mi_desc" placeholder="Shown under the item name">
+        </div>
+        <div class="field-row" id="miPriceRow">
+          <div class="field">
+            <label for="mi_price">Price ($)</label>
+            <input type="number" id="mi_price" min="0" step="0.01">
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;padding-bottom:12px;">
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:400;text-transform:none;letter-spacing:normal;">
+              <input type="checkbox" id="mi_perguest" style="width:auto;"> Priced per guest
+            </label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="mi_image">Photo URL (optional)</label>
+          <input type="url" id="mi_image" placeholder="https://…">
+        </div>
+        <div class="form-msg" id="miMsg"></div>
+        <div style="display:flex;gap:10px;margin-top:6px;">
+          <button type="button" class="btn btn-primary" id="miSave" style="flex:1;justify-content:center;">Save Item</button>
+          <button type="button" class="btn btn-outline" id="miDelete" style="border-color:var(--maroon);color:var(--maroon);display:none;">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ===================== Contacts ===================== -->
   <section class="admin-panel" id="panel-contacts">

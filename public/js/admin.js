@@ -93,6 +93,7 @@ async function loadBookings() {
     bookings = data.bookings || [];
     renderBookings();
     renderAdminCalendar();
+    renderDashboard();
   } catch (err) {
     showGlobalMsg("error", err.message);
   }
@@ -340,6 +341,7 @@ async function loadLunchEvents() {
     lunchEvents = data.events || [];
     renderLunchEvents();
     populateOrdersEventFilter();
+    renderDashboard();
   } catch (err) {
     showGlobalMsg("error", err.message);
   }
@@ -473,6 +475,7 @@ async function loadLunchOrders() {
     lunchOrders = data.orders || [];
     renderLunchOrders();
     populateOrdersEventFilter();
+    renderDashboard();
   } catch (err) {
     showGlobalMsg("error", err.message);
   }
@@ -989,6 +992,94 @@ function formatShortDate(s) {
   }
 }
 
+// ---- dashboard ---------------------------------------------------------------
+// Pure read/derive from data already loaded for the other tabs (bookings,
+// lunchEvents, lunchOrders) — no extra API calls. Called again whenever any
+// of those reload, so it stays current without its own refresh button.
+
+function renderDashboard() {
+  renderDashboardLunchSale();
+  renderDashboardOrders();
+}
+
+function switchAdminTab(panelId) {
+  document.querySelector(`.admin-tabs button[data-panel="${panelId}"]`)?.click();
+}
+
+function renderDashboardLunchSale() {
+  const el = document.getElementById("dashLunchSale");
+  if (!el) return;
+
+  const live = lunchEvents
+    .filter((ev) => ev.status === "live")
+    .sort((a, b) => new Date(a.sale_date) - new Date(b.sale_date))[0];
+
+  if (!live) {
+    el.innerHTML = `<p class="subtle">No live lunch sale right now — create or activate one from the Lunch Sale tab.</p>`;
+    return;
+  }
+
+  const orders = lunchOrders.filter((o) => o.event_id === live.id);
+  const paid = orders.filter((o) => o.status === "paid");
+  const paidTotal = paid.reduce((sum, o) => sum + (o.total_cents || 0), 0);
+  const dropoffs =
+    parseOrderItems(live.dropoff_options)
+      .map((d) => `${d.time} — ${d.location}`)
+      .join(" · ") || "—";
+  const cutoffPassed = new Date(live.order_cutoff_at).getTime() < Date.now();
+
+  el.innerHTML = `
+    <div class="dash-stats">
+      <div class="dash-stat"><span class="num">${escapeHtml(String(live.slot_cap))}</span><span class="label">Slot Cap</span></div>
+      <div class="dash-stat"><span class="num">$${(live.price_cents / 100).toFixed(2)}</span><span class="label">Price / Lunch</span></div>
+      <div class="dash-stat"><span class="num">${paid.length}/${live.slot_cap}</span><span class="label">Orders Paid</span></div>
+      <div class="dash-stat"><span class="num">$${(paidTotal / 100).toFixed(2)}</span><span class="label">Payments Received</span></div>
+    </div>
+    <p style="margin:14px 0 4px;"><strong>${escapeHtml(live.title)}</strong>${
+    cutoffPassed ? ` <span class="status-pill status-closed">cutoff passed</span>` : ""
+  }</p>
+    <p class="subtle" style="margin-bottom:4px;">For ${escapeHtml(formatShortDate(live.sale_date))} · cutoff ${escapeHtml(
+    formatDateTime(live.order_cutoff_at)
+  )}</p>
+    <p class="subtle" style="margin-bottom:0;">Drop-off: ${escapeHtml(dropoffs)}</p>
+    <button type="button" class="btn btn-outline" style="margin-top:14px;padding:8px 16px;font-size:0.72rem;" data-goto-lunch>View in Lunch Sale tab</button>`;
+
+  el.querySelector("[data-goto-lunch]")?.addEventListener("click", () => switchAdminTab("panel-lunch"));
+}
+
+function renderDashboardOrders() {
+  const el = document.getElementById("dashOrders");
+  if (!el) return;
+
+  const pending = bookings.filter((b) => b.status === "pending_approval");
+  const awaiting = bookings.filter((b) => b.status === "approved");
+  const confirmed = bookings.filter((b) => b.status === "confirmed");
+  const depositTotal = confirmed.reduce((sum, b) => sum + (b.deposit_amount_cents || 0), 0);
+
+  const pendingList = pending
+    .slice(0, 5)
+    .map((b) => `<li><span>${escapeHtml(b.name)}</span><span class="subtle">${escapeHtml(b.event_date)}</span></li>`)
+    .join("");
+
+  el.innerHTML = `
+    <div class="dash-stats">
+      <div class="dash-stat"><span class="num">${pending.length}</span><span class="label">Pending Requests</span></div>
+      <div class="dash-stat"><span class="num">${awaiting.length}</span><span class="label">Awaiting Deposit</span></div>
+      <div class="dash-stat"><span class="num">${confirmed.length}</span><span class="label">Deposits Paid</span></div>
+      <div class="dash-stat"><span class="num">$${(depositTotal / 100).toFixed(2)}</span><span class="label">Deposits Collected</span></div>
+    </div>
+    ${
+      pending.length
+        ? `<p class="row-label" style="margin-top:14px;">Pending requests</p><ul class="dash-list">${pendingList}</ul>${
+            pending.length > 5 ? `<p class="subtle">+${pending.length - 5} more.</p>` : ""
+          }`
+        : `<p class="subtle" style="margin-top:14px;">No pending requests.</p>`
+    }
+    <button type="button" class="btn btn-outline" style="margin-top:10px;padding:8px 16px;font-size:0.72rem;" data-goto-bookings>View in Custom Orders tab</button>`;
+
+  el.querySelector("[data-goto-bookings]")?.addEventListener("click", () => switchAdminTab("panel-bookings"));
+}
+
 // ---- occasions (Menus tab) --------------------------------------------------
 // Admin-editable list of Occasion options shown on the Custom Order form.
 // Backed by the D1 site_settings table (see src/lib/menu-data.js), so
@@ -1081,19 +1172,48 @@ async function saveOccasions() {
 // rows are dropped and prices/ids are normalized before saving.
 
 const MENU_LIST_CONFIG = {
-  boxed_lunch: { entrees: { quoted: false }, enhancements: { quoted: false } },
-  charcuterie: { boards: { quoted: false }, enhancements: { quoted: false } },
-  custom_meal: { boxes: { quoted: false }, personalization: { quoted: true } },
+  boxed_lunch: {
+    entrees: { quoted: false, label: "Entrées", singular: "Entrée" },
+    enhancements: { quoted: false, label: "Enhancements", singular: "Enhancement" },
+  },
+  charcuterie: {
+    boards: { quoted: false, label: "Boards", singular: "Board" },
+    enhancements: { quoted: false, label: "Enhancements", singular: "Enhancement" },
+  },
+  custom_meal: {
+    boxes: { quoted: false, label: "Box Collections", singular: "Box" },
+    personalization: { quoted: true, label: "Personalization", singular: "Option" },
+  },
 };
+
+const MENU_CATEGORY_LABELS = {
+  boxed_lunch: "Boxed Lunch",
+  charcuterie: "Charcuterie Board",
+  custom_meal: "Custom Boxed Meal",
+};
+
+// Which item the popup editor currently has open — { cat, listKey, idx }.
+// idx is null while creating a new item, otherwise the index being edited.
+let miState = { cat: null, listKey: null, idx: null };
 
 function wireMenus() {
   document.querySelectorAll("[data-add-item]").forEach((btn) =>
     btn.addEventListener("click", () => {
       const [cat, listKey] = btn.dataset.addItem.split(".");
-      addMenuItem(cat, listKey);
+      openMenuItemModal(cat, listKey, null);
     })
   );
+  document.querySelectorAll("[data-edit-existing]").forEach((btn) =>
+    btn.addEventListener("click", () => openMenuItemModal(btn.dataset.editExisting, null, null))
+  );
   document.getElementById("menusSave").addEventListener("click", saveOrderMenus);
+  document.getElementById("menuItemModalClose").addEventListener("click", closeMenuItemModal);
+  document.getElementById("menuItemModal").addEventListener("click", (e) => {
+    if (e.target.id === "menuItemModal") closeMenuItemModal();
+  });
+  document.getElementById("miSelect").addEventListener("change", onMiSelectChange);
+  document.getElementById("miSave").addEventListener("click", saveMenuItem);
+  document.getElementById("miDelete").addEventListener("click", deleteMenuItem);
   Object.keys(MENU_LIST_CONFIG).forEach((cat) => {
     document.getElementById(`note_${cat}`).addEventListener("input", (e) => {
       if (!orderMenus) return;
@@ -1123,102 +1243,157 @@ function renderOrderMenus() {
     const menu = orderMenus[cat];
     const noteEl = document.getElementById(`note_${cat}`);
     if (noteEl) noteEl.value = menu.note || "";
-    for (const [listKey, { quoted }] of Object.entries(lists)) {
+    for (const listKey of Object.keys(lists)) {
       if (!Array.isArray(menu[listKey])) menu[listKey] = [];
-      renderItemRows(cat, listKey, quoted);
+      renderItemList(cat, listKey);
     }
   }
 }
 
-function renderItemRows(cat, listKey, quoted) {
+// Compact read-only list — clicking a row opens the popup editor pre-loaded
+// with that item. Editing itself always happens inside the popup now.
+function renderItemList(cat, listKey) {
   const wrap = document.getElementById(`items_${cat}_${listKey}`);
   if (!wrap) return;
   const items = orderMenus[cat][listKey];
+  const quoted = MENU_LIST_CONFIG[cat][listKey].quoted;
 
-  wrap.innerHTML =
-    items.map((item, i) => itemRowHtml(cat, listKey, item, i, quoted)).join("") ||
-    `<p class="subtle">No items yet — add one above.</p>`;
+  if (!items.length) {
+    wrap.innerHTML = `<p class="mi-empty">No items yet — use + Add above.</p>`;
+    return;
+  }
 
-  wrap.querySelectorAll("input").forEach((el) => el.addEventListener("input", () => onItemFieldChange(el)));
-  wrap.querySelectorAll("[data-remove-item]").forEach((btn) =>
+  wrap.innerHTML = items
+    .map(
+      (item, i) => `
+    <button type="button" class="mi-row" data-open-item="${cat}.${listKey}.${i}">
+      <span class="mi-name">${escapeHtml(item.name || "(untitled)")}</span>
+      <span class="mi-price">${
+        quoted
+          ? "custom quote"
+          : `$${((item.price_cents || 0) / 100).toFixed(2)}${item.per_guest ? "/guest" : ""}`
+      }</span>
+    </button>`
+    )
+    .join("");
+
+  wrap.querySelectorAll("[data-open-item]").forEach((btn) =>
     btn.addEventListener("click", () => {
-      const [c, l, idx] = btn.dataset.removeItem.split(".");
-      removeMenuItem(c, l, Number(idx));
+      const [c, l, idx] = btn.dataset.openItem.split(".");
+      openMenuItemModal(c, l, Number(idx));
     })
   );
 }
 
-function itemRowHtml(cat, listKey, item, i, quoted) {
-  const attrs = `data-cat="${cat}" data-list="${listKey}" data-idx="${i}"`;
-  if (quoted) {
-    return `
-    <div class="menu-item-row quoted-row">
-      <div><span class="row-label">Name</span><input type="text" class="mi-name" ${attrs} value="${escapeHtml(
-      item.name || ""
-    )}"></div>
-      <div><span class="row-label">Description</span><input type="text" class="mi-desc" ${attrs} value="${escapeHtml(
-      item.description || ""
-    )}"></div>
-      <div><span class="row-label">ID</span><input type="text" class="mi-id" ${attrs} value="${escapeHtml(
-      item.id || ""
-    )}" placeholder="auto"></div>
-      <button type="button" class="btn btn-outline remove-item" data-remove-item="${cat}.${listKey}.${i}">Remove</button>
-    </div>`;
+// ---- popup item editor (used by both "+ Add X" and "Edit Existing Menu") ----
+
+function openMenuItemModal(cat, listKey, idx) {
+  miState = { cat, listKey: listKey || null, idx: idx ?? null };
+  const select = document.getElementById("miSelect");
+  select.innerHTML = buildMiSelectOptions(cat);
+
+  if (idx != null && listKey) {
+    select.value = `edit:${listKey}:${idx}`;
+  } else if (listKey) {
+    select.value = `new:${listKey}`;
+  } else {
+    // Opened via "Edit Existing Menu" with no specific item — default to
+    // the first existing item in this category, or the first "add new"
+    // slot if the category has nothing in it yet.
+    const firstExisting = select.querySelector('option[value^="edit:"]');
+    select.value = firstExisting ? firstExisting.value : select.options[0]?.value;
   }
-  return `
-    <div class="menu-item-row">
-      <div><span class="row-label">Name</span><input type="text" class="mi-name" ${attrs} value="${escapeHtml(
-    item.name || ""
-  )}"></div>
-      <div><span class="row-label">Description</span><input type="text" class="mi-desc" ${attrs} value="${escapeHtml(
-    item.description || ""
-  )}"></div>
-      <div><span class="row-label">Price ($)</span><input type="number" min="0" step="0.01" class="mi-price" ${attrs} value="${(
-    (item.price_cents || 0) / 100
-  ).toFixed(2)}"></div>
-      <div class="per-guest-wrap"><label><input type="checkbox" class="mi-perguest" ${attrs} ${
-    item.per_guest ? "checked" : ""
-  }> /guest</label></div>
-      <div><span class="row-label">Image URL</span><input type="url" class="mi-image" ${attrs} value="${escapeHtml(
-    item.image_url || ""
-  )}" placeholder="https://…"></div>
-      <div><span class="row-label">ID</span><input type="text" class="mi-id" ${attrs} value="${escapeHtml(
-    item.id || ""
-  )}" placeholder="auto"></div>
-      <button type="button" class="btn btn-outline remove-item" data-remove-item="${cat}.${listKey}.${i}">Remove</button>
-    </div>`;
+
+  document.getElementById("menuItemModalTitle").textContent = `${MENU_CATEGORY_LABELS[cat]} Menu`;
+  document.getElementById("menuItemModal").style.display = "flex";
+  onMiSelectChange();
 }
 
-function onItemFieldChange(el) {
-  const cat = el.dataset.cat;
-  const listKey = el.dataset.list;
-  const idx = Number(el.dataset.idx);
-  const item = orderMenus?.[cat]?.[listKey]?.[idx];
-  if (!item) return;
-  if (el.classList.contains("mi-name")) item.name = el.value;
-  else if (el.classList.contains("mi-desc")) item.description = el.value;
-  else if (el.classList.contains("mi-id")) item.id = el.value;
-  else if (el.classList.contains("mi-price")) item.price_cents = Math.round((Number(el.value) || 0) * 100);
-  else if (el.classList.contains("mi-perguest")) item.per_guest = el.checked;
-  else if (el.classList.contains("mi-image")) item.image_url = el.value;
+function buildMiSelectOptions(cat) {
+  let html = "";
+  for (const [listKey, cfg] of Object.entries(MENU_LIST_CONFIG[cat])) {
+    const items = orderMenus?.[cat]?.[listKey] || [];
+    html += `<optgroup label="${escapeHtml(cfg.label)}">`;
+    html += `<option value="new:${listKey}">+ Add new ${escapeHtml(cfg.singular)}</option>`;
+    items.forEach((item, i) => {
+      html += `<option value="edit:${listKey}:${i}">${escapeHtml(item.name || "(untitled)")}</option>`;
+    });
+    html += `</optgroup>`;
+  }
+  return html;
 }
 
-function addMenuItem(cat, listKey) {
-  if (!orderMenus) return;
-  if (!orderMenus[cat]) orderMenus[cat] = {};
-  if (!Array.isArray(orderMenus[cat][listKey])) orderMenus[cat][listKey] = [];
-  const quoted = MENU_LIST_CONFIG[cat]?.[listKey]?.quoted;
-  const item = quoted
-    ? { id: "", name: "", description: "", quoted: true }
-    : { id: "", name: "", description: "", price_cents: 0, per_guest: false, image_url: "" };
-  orderMenus[cat][listKey].push(item);
-  renderItemRows(cat, listKey, quoted);
+function onMiSelectChange() {
+  const select = document.getElementById("miSelect");
+  const [mode, listKey, idxStr] = select.value.split(":");
+  miState.listKey = listKey;
+  miState.idx = mode === "edit" ? Number(idxStr) : null;
+
+  const quoted = MENU_LIST_CONFIG[miState.cat][listKey].quoted;
+  const item = mode === "edit" ? orderMenus[miState.cat][listKey][miState.idx] : null;
+
+  document.getElementById("mi_name").value = item?.name || "";
+  document.getElementById("mi_desc").value = item?.description || "";
+  document.getElementById("mi_price").value = item ? ((item.price_cents || 0) / 100).toFixed(2) : "";
+  document.getElementById("mi_perguest").checked = !!item?.per_guest;
+  document.getElementById("mi_image").value = item?.image_url || "";
+
+  document.getElementById("miPriceRow").style.display = quoted ? "none" : "grid";
+  document.getElementById("miDelete").style.display = mode === "edit" ? "inline-flex" : "none";
+  document.getElementById("miMsg").className = "form-msg";
+  document.getElementById("miFields").style.display = "block";
 }
 
-function removeMenuItem(cat, listKey, idx) {
-  if (!orderMenus?.[cat]?.[listKey]) return;
+function closeMenuItemModal() {
+  document.getElementById("menuItemModal").style.display = "none";
+}
+
+function saveMenuItem() {
+  const msgEl = document.getElementById("miMsg");
+  const { cat, listKey, idx } = miState;
+  const name = document.getElementById("mi_name").value.trim();
+  if (!name) {
+    showMsg(msgEl, "error", "Name is required.");
+    return;
+  }
+
+  const quoted = MENU_LIST_CONFIG[cat][listKey].quoted;
+  const existing = idx != null ? orderMenus[cat][listKey][idx] : null;
+  const item = {
+    id: existing?.id || "",
+    name,
+    description: document.getElementById("mi_desc").value.trim(),
+  };
+  if (quoted) {
+    item.quoted = true;
+  } else {
+    item.price_cents = Math.round((Number(document.getElementById("mi_price").value) || 0) * 100);
+    item.per_guest = document.getElementById("mi_perguest").checked;
+    const image = document.getElementById("mi_image").value.trim();
+    if (image) item.image_url = image;
+  }
+
+  if (idx != null) {
+    orderMenus[cat][listKey][idx] = item;
+  } else {
+    orderMenus[cat][listKey].push(item);
+  }
+
+  renderItemList(cat, listKey);
+  closeMenuItemModal();
+  showGlobalMsg("success", `"${name}" saved — click "Save All Menus" below to publish it.`);
+}
+
+function deleteMenuItem() {
+  const { cat, listKey, idx } = miState;
+  if (idx == null) return;
+  const item = orderMenus[cat][listKey][idx];
+  if (!confirm(`Remove "${item?.name || "this item"}" from the menu?`)) return;
+
   orderMenus[cat][listKey].splice(idx, 1);
-  renderItemRows(cat, listKey, MENU_LIST_CONFIG[cat]?.[listKey]?.quoted);
+  renderItemList(cat, listKey);
+  closeMenuItemModal();
+  showGlobalMsg("success", `Removed — click "Save All Menus" below to publish it.`);
 }
 
 async function saveOrderMenus() {
