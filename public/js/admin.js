@@ -12,6 +12,9 @@ let blockedDates = [];
 let dropoffRowCount = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
+  const yearEl = document.getElementById("year");
+  if (yearEl) yearEl.textContent = new Date().getFullYear();
+
   wireTabs();
   wireBookings();
   wireLunchEvents();
@@ -19,6 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
   wireContacts();
   wireCalendar();
   wireBlockedDates();
+  wireAdminCalendar();
 
   loadBookings();
   loadContacts();
@@ -27,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSignups();
   loadCalendarStatus();
   loadBlockedDates();
+  renderAdminCalendar();
 
   if (window.location.hash === "#calendar-connected") {
     showGlobalMsg("success", "Google Calendar connected.");
@@ -81,6 +86,7 @@ async function loadBookings() {
     const data = await api("/api/admin/bookings");
     bookings = data.bookings || [];
     renderBookings();
+    renderAdminCalendar();
   } catch (err) {
     showGlobalMsg("error", err.message);
   }
@@ -317,6 +323,7 @@ async function loadLunchEvents() {
     const data = await api("/api/admin/lunch-sale/events");
     lunchEvents = data.events || [];
     renderLunchEvents();
+    populateOrdersEventFilter();
   } catch (err) {
     showGlobalMsg("error", err.message);
   }
@@ -336,6 +343,31 @@ function renderLunchEvents() {
   list.querySelectorAll("[data-notify]").forEach((btn) =>
     btn.addEventListener("click", () => notifySignups(btn.dataset.notify))
   );
+  list.querySelectorAll("[data-delete-event]").forEach((btn) =>
+    btn.addEventListener("click", () => deleteLunchEvent(btn.dataset.deleteEvent))
+  );
+  list.querySelectorAll("[data-export-event]").forEach((btn) =>
+    btn.addEventListener("click", () => exportEventOrders(btn.dataset.exportEvent))
+  );
+}
+
+// Keeps the Orders tab's event filter dropdown in sync with whatever
+// events exist. Safe to call before lunchOrders/lunchEvents are loaded —
+// it just re-runs once the data shows up.
+function populateOrdersEventFilter() {
+  const sel = document.getElementById("ordersEventFilter");
+  if (!sel) return;
+  const current = sel.value;
+  const options = [`<option value="">All events (full history)</option>`].concat(
+    lunchEvents.map(
+      (ev) =>
+        `<option value="${escapeHtml(ev.id)}">${escapeHtml(ev.title)} — ${escapeHtml(
+          formatShortDate(ev.sale_date)
+        )}</option>`
+    )
+  );
+  sel.innerHTML = options.join("");
+  if (current && lunchEvents.some((ev) => ev.id === current)) sel.value = current;
 }
 
 function eventCard(ev) {
@@ -351,6 +383,8 @@ function eventCard(ev) {
     actions += `<button class="btn btn-outline" data-set-status="${ev.id}" data-status="canceled" style="border-color:var(--maroon);color:var(--maroon);">Cancel</button>`;
   }
   actions += `<button class="btn btn-outline" data-notify="${ev.id}">Notify Signups</button>`;
+  actions += `<button class="btn btn-outline" data-export-event="${ev.id}">Export Orders</button>`;
+  actions += `<button class="btn btn-outline" data-delete-event="${ev.id}" style="border-color:var(--maroon);color:var(--maroon);">Delete</button>`;
 
   return `
     <div class="event-card">
@@ -382,6 +416,17 @@ async function setEventStatus(id, status) {
   }
 }
 
+async function deleteLunchEvent(id) {
+  if (!confirm("Delete this lunch sale event? This can't be undone.")) return;
+  try {
+    await api(`/api/admin/lunch-sale/events/${id}`, { method: "DELETE" });
+    showGlobalMsg("success", "Lunch sale event deleted.");
+    loadLunchEvents();
+  } catch (err) {
+    showGlobalMsg("error", err.message);
+  }
+}
+
 async function notifySignups(id) {
   try {
     const data = await api(`/api/admin/lunch-sale/events/${id}/notify-signups`, { method: "POST" });
@@ -396,6 +441,10 @@ async function notifySignups(id) {
 function wireLunchOrders() {
   document.getElementById("ordersRefresh").addEventListener("click", loadLunchOrders);
   document.getElementById("ordersSearch").addEventListener("input", renderLunchOrders);
+  document.getElementById("ordersEventFilter").addEventListener("change", renderLunchOrders);
+  document.getElementById("ordersDownload").addEventListener("click", () => {
+    exportOrdersToExcel(getFilteredOrders(), currentOrdersExportName());
+  });
   document.getElementById("signupsRefresh").addEventListener("click", loadSignups);
 }
 
@@ -404,19 +453,35 @@ async function loadLunchOrders() {
     const data = await api("/api/admin/lunch-sale/orders");
     lunchOrders = data.orders || [];
     renderLunchOrders();
+    populateOrdersEventFilter();
   } catch (err) {
     showGlobalMsg("error", err.message);
   }
 }
 
-function renderLunchOrders() {
+// This list is never scoped to "the current sale" — it's every lunch-sale
+// order ever placed, oldest events included, so it doubles as the past
+// orders view. The event dropdown + search box just narrow what's shown.
+function getFilteredOrders() {
   const q = document.getElementById("ordersSearch").value.trim().toLowerCase();
-  const filtered = q
-    ? lunchOrders.filter((o) =>
-        [o.name, o.email, o.event_title].some((v) => String(v || "").toLowerCase().includes(q))
-      )
-    : lunchOrders;
+  const eventId = document.getElementById("ordersEventFilter").value;
+  return lunchOrders.filter((o) => {
+    if (eventId && o.event_id !== eventId) return false;
+    if (!q) return true;
+    return [o.name, o.email, o.event_title].some((v) => String(v || "").toLowerCase().includes(q));
+  });
+}
 
+function currentOrdersExportName() {
+  const eventId = document.getElementById("ordersEventFilter").value;
+  const ev = lunchEvents.find((e) => e.id === eventId);
+  return ev
+    ? `boxed-indulgence-${slugify(ev.title)}-${ev.sale_date}`
+    : "boxed-indulgence-lunch-orders";
+}
+
+function renderLunchOrders() {
+  const filtered = getFilteredOrders();
   const body = document.getElementById("ordersBody");
   if (!filtered.length) {
     body.innerHTML = `<tr><td colspan="7" class="subtle">No orders found.</td></tr>`;
@@ -436,6 +501,82 @@ function renderLunchOrders() {
     </tr>`
     )
     .join("");
+}
+
+// ---- Excel (CSV) export -----------------------------------------------------
+// No spreadsheet library is loaded on the site, so this writes a UTF-8 CSV
+// with a BOM — Excel, Numbers, and Sheets all open that as a normal
+// spreadsheet on double-click without any extra setup.
+
+const ORDER_CSV_HEADERS = [
+  "Event",
+  "Sale Date",
+  "Name",
+  "Email",
+  "Phone",
+  "Qty",
+  "Drop-off",
+  "Total ($)",
+  "Status",
+  "Ordered At",
+];
+
+function orderToCsvRow(o) {
+  return [
+    o.event_title,
+    o.event_sale_date,
+    o.name,
+    o.email,
+    o.phone || "",
+    o.quantity,
+    o.dropoff_choice,
+    (o.total_cents / 100).toFixed(2),
+    o.status,
+    formatDateTime(o.created_at),
+  ];
+}
+
+function exportOrdersToExcel(orders, filenameBase) {
+  if (!orders.length) {
+    showGlobalMsg("error", "No orders to export.");
+    return;
+  }
+  downloadCsv(`${filenameBase}.csv`, ORDER_CSV_HEADERS, orders.map(orderToCsvRow));
+}
+
+function exportEventOrders(eventId) {
+  const ev = lunchEvents.find((e) => e.id === eventId);
+  const orders = lunchOrders.filter((o) => o.event_id === eventId);
+  const base = ev ? `boxed-indulgence-${slugify(ev.title)}-${ev.sale_date}` : `boxed-indulgence-event-${eventId}`;
+  exportOrdersToExcel(orders, base);
+}
+
+function csvEscape(value) {
+  const s = String(value ?? "");
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function downloadCsv(filename, headers, rows) {
+  const lines = [headers.map(csvEscape).join(","), ...rows.map((row) => row.map(csvEscape).join(","))];
+  // Leading BOM so Excel reads accented characters correctly on open.
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function slugify(s) {
+  return (
+    String(s || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "event"
+  );
 }
 
 async function loadSignups() {
@@ -577,6 +718,7 @@ async function loadBlockedDates() {
     const data = await api("/api/admin/blocked-dates");
     blockedDates = data.blocked || [];
     renderBlockedDates();
+    renderAdminCalendar();
   } catch (err) {
     showGlobalMsg("error", err.message);
   }
@@ -632,6 +774,140 @@ async function removeBlockedDate(date) {
   }
 }
 
+// ---- availability calendar (admin view) ------------------------------------
+// Purely a client-side view over the bookings + blockedDates arrays already
+// loaded elsewhere on this page — no separate API call, so it always reflects
+// whatever's currently in memory and re-renders whenever either reloads.
+
+const adminCal = { viewYear: null, viewMonth: null };
+
+function wireAdminCalendar() {
+  const today = new Date();
+  adminCal.viewYear = today.getFullYear();
+  adminCal.viewMonth = today.getMonth();
+  document.getElementById("adminPrevMonth").addEventListener("click", () => shiftAdminCalendar(-1));
+  document.getElementById("adminNextMonth").addEventListener("click", () => shiftAdminCalendar(1));
+}
+
+function shiftAdminCalendar(delta) {
+  adminCal.viewMonth += delta;
+  if (adminCal.viewMonth < 0) {
+    adminCal.viewMonth = 11;
+    adminCal.viewYear -= 1;
+  }
+  if (adminCal.viewMonth > 11) {
+    adminCal.viewMonth = 0;
+    adminCal.viewYear += 1;
+  }
+  renderAdminCalendar();
+  document.getElementById("adminCalendarDetail").innerHTML = "";
+}
+
+function renderAdminCalendar() {
+  const grid = document.getElementById("adminCalendarGrid");
+  const label = document.getElementById("adminCalendarLabel");
+  if (!grid || !label || adminCal.viewYear == null) return;
+
+  label.textContent = new Date(adminCal.viewYear, adminCal.viewMonth, 1).toLocaleDateString(undefined, {
+    month: "long",
+    year: "numeric",
+  });
+
+  const bookingsByDate = new Map();
+  bookings
+    .filter((b) => ["pending_approval", "approved", "confirmed"].includes(b.status))
+    .forEach((b) => {
+      if (!bookingsByDate.has(b.event_date)) bookingsByDate.set(b.event_date, []);
+      bookingsByDate.get(b.event_date).push(b);
+    });
+
+  const blockedByDate = new Map();
+  blockedDates.forEach((b) => blockedByDate.set(b.date, b));
+
+  grid.innerHTML = "";
+  ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].forEach((d) => {
+    const el = document.createElement("div");
+    el.className = "dow";
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDay = new Date(adminCal.viewYear, adminCal.viewMonth, 1);
+  const startOffset = firstDay.getDay();
+  const daysInMonth = new Date(adminCal.viewYear, adminCal.viewMonth + 1, 0).getDate();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let i = 0; i < startOffset; i++) {
+    const el = document.createElement("div");
+    el.className = "day empty";
+    grid.appendChild(el);
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateObj = new Date(adminCal.viewYear, adminCal.viewMonth, day);
+    const dateStr = `${adminCal.viewYear}-${String(adminCal.viewMonth + 1).padStart(2, "0")}-${String(
+      day
+    ).padStart(2, "0")}`;
+
+    const dayBookings = bookingsByDate.get(dateStr) || [];
+    const blocked = blockedByDate.get(dateStr);
+
+    let cls = "day";
+    if (dateObj.getTime() === today.getTime()) cls += " today";
+    if (dayBookings.length) {
+      cls += " booked";
+    } else if (blocked) {
+      cls += blocked.source === "google_calendar" ? " blocked-cal" : " blocked";
+    } else if (dateObj < today) {
+      cls += " past";
+    } else {
+      cls += " available";
+    }
+
+    const el = document.createElement("div");
+    el.className = cls;
+    el.textContent = String(day);
+    el.addEventListener("click", () => showAdminCalendarDetail(dateStr, dayBookings, blocked));
+    grid.appendChild(el);
+  }
+}
+
+function showAdminCalendarDetail(dateStr, dayBookings, blocked) {
+  const el = document.getElementById("adminCalendarDetail");
+  const niceDate = new Date(`${dateStr}T00:00:00`).toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  if (dayBookings.length) {
+    el.innerHTML = `<strong>${escapeHtml(niceDate)}</strong> — ${dayBookings
+      .map((b) => `${escapeHtml(b.name)} (${escapeHtml(b.status.replace(/_/g, " "))})`)
+      .join(", ")}`;
+    return;
+  }
+
+  if (blocked) {
+    const isGoogle = blocked.source === "google_calendar";
+    el.innerHTML = `<strong>${escapeHtml(niceDate)}</strong> — Blocked${
+      blocked.reason ? `: ${escapeHtml(blocked.reason)}` : ""
+    }${isGoogle ? " (synced from Google Calendar)" : ""}${
+      isGoogle
+        ? ""
+        : ` <button class="btn btn-outline" data-unblock-cal="${escapeHtml(
+            blocked.date
+          )}" style="padding:4px 10px;font-size:0.68rem;margin-left:8px;">Remove block</button>`
+    }`;
+    const btn = el.querySelector("[data-unblock-cal]");
+    if (btn) btn.addEventListener("click", () => removeBlockedDate(btn.dataset.unblockCal));
+    return;
+  }
+
+  el.innerHTML = `<strong>${escapeHtml(niceDate)}</strong> — Available.`;
+}
+
 // ---- shared helpers -----------------------------------------------------------
 
 function showMsg(el, type, text) {
@@ -660,6 +936,17 @@ function formatDateTime(s) {
       hour: "numeric",
       minute: "2-digit",
     });
+  } catch {
+    return s;
+  }
+}
+
+// Date-only (no time) — used for the lunch-sale event picker, e.g. "Aug 25, 2026".
+function formatShortDate(s) {
+  if (!s) return "—";
+  try {
+    const d = new Date(`${s}T00:00:00`);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
   } catch {
     return s;
   }

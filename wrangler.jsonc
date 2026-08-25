@@ -33,7 +33,7 @@
   "vars": {
     "BUSINESS_NAME": "Boxed Indulgence",
     "CLIENT_NOTIFY_EMAIL": "boxedindulgenceadmin@gmail.com",
-    "FROM_EMAIL": "orders@boxedindulgence.com",
+    "FROM_EMAIL": "bookings@boxedindulgence.com",
 
     // Custom-order deposit: percentage of the itemized order total.
     "DEPOSIT_PERCENT": "50",

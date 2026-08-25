@@ -197,6 +197,21 @@ export async function listAllLunchSaleEvents(env) {
   return results;
 }
 
+// Every order row ever placed against this event, regardless of status —
+// used to block deleting an event that has real order history attached.
+export async function countLunchSaleOrdersForEvent(env, eventId) {
+  const { count } = await env.DB.prepare(
+    "SELECT COUNT(*) as count FROM lunch_sale_orders WHERE event_id = ?"
+  )
+    .bind(eventId)
+    .first();
+  return count;
+}
+
+export async function deleteLunchSaleEvent(env, id) {
+  await env.DB.prepare("DELETE FROM lunch_sale_events WHERE id = ?").bind(id).run();
+}
+
 // ---- lunch-sale orders ----------------------------------------------------
 
 export async function insertLunchSaleOrder(env, order) {

@@ -20,6 +20,8 @@ import {
   findBookingByPaymentIntent,
   insertLunchSaleEvent,
   updateLunchSaleEvent,
+  deleteLunchSaleEvent,
+  countLunchSaleOrdersForEvent,
   getLunchSaleEvent,
   getCurrentLiveLunchSaleEvent,
   listAllLunchSaleEvents,
@@ -211,6 +213,12 @@ async function routeAdmin(request, env, pathname, identity) {
     request.method === "POST"
   ) {
     return handleAdminNotifySignups(env, pathname);
+  }
+  if (
+    pathname.match(/^\/api\/admin\/lunch-sale\/events\/[^/]+$/) &&
+    request.method === "DELETE"
+  ) {
+    return handleAdminDeleteLunchSaleEvent(env, pathname);
   }
   if (pathname === "/api/admin/lunch-sale/orders" && request.method === "GET") {
     return json({ orders: await listAllLunchSaleOrders(env) });
@@ -717,6 +725,27 @@ async function handleAdminUpdateLunchSaleEvent(request, env, pathname) {
 
   await updateLunchSaleEvent(env, id, fields);
   return json({ ok: true, event: await getLunchSaleEvent(env, id) });
+}
+
+async function handleAdminDeleteLunchSaleEvent(env, pathname) {
+  const id = pathname.split("/")[5];
+  const event = await getLunchSaleEvent(env, id);
+  if (!event) return json({ error: "Event not found." }, 404);
+
+  const orderCount = await countLunchSaleOrdersForEvent(env, id);
+  if (orderCount > 0) {
+    return json(
+      {
+        error: `Can't delete — ${orderCount} order${
+          orderCount === 1 ? "" : "s"
+        } are on file for this event. Cancel it instead to keep the order history intact.`,
+      },
+      400
+    );
+  }
+
+  await deleteLunchSaleEvent(env, id);
+  return json({ ok: true });
 }
 
 async function handleAdminNotifySignups(env, pathname) {
