@@ -46,6 +46,7 @@ import {
   bookingApprovedEmailToCustomer,
   bookingRejectedEmailToCustomer,
   bookingCanceledEmailToCustomer,
+  formatDate,
   depositConfirmedEmail,
   contactMessageEmailToClient,
   lunchSaleOrderReceivedEmailToClient,
@@ -440,7 +441,7 @@ async function handleCreateBooking(request, env) {
   await Promise.allSettled([
     sendEmail(env, {
       to: env.CLIENT_NOTIFY_EMAIL,
-      subject: `New booking request — ${event_date}`,
+      subject: `New booking request — ${formatDate(event_date)}`,
       html: bookingRequestEmailToClient(env, booking),
       replyTo: email,
     }),
@@ -758,7 +759,7 @@ async function handleAdminApprove(request, env, pathname) {
   const checkoutPageUrl = `${env.SITE_URL}/booking/checkout/?booking=${id}`;
   await sendEmail(env, {
     to: updated.email,
-    subject: `You're approved for ${updated.event_date}! Next step: deposit`,
+    subject: `You're approved for ${formatDate(updated.event_date)}! Next step: deposit`,
     html: bookingApprovedEmailToCustomer(env, updated, checkoutPageUrl),
   });
 
@@ -774,7 +775,7 @@ async function handleAdminReject(env, pathname) {
 
   await sendEmail(env, {
     to: booking.email,
-    subject: `Update on your request for ${booking.event_date}`,
+    subject: `Update on your request for ${formatDate(booking.event_date)}`,
     html: bookingRejectedEmailToCustomer(env, booking),
   });
 
@@ -794,7 +795,7 @@ async function handleAdminResendDepositLink(env, pathname) {
   const checkoutPageUrl = `${env.SITE_URL}/booking/checkout/?booking=${id}`;
   await sendEmail(env, {
     to: updated.email,
-    subject: `Your deposit link — ${updated.event_date}`,
+    subject: `Your deposit link — ${formatDate(updated.event_date)}`,
     html: bookingApprovedEmailToCustomer(env, updated, checkoutPageUrl),
   });
 
@@ -824,7 +825,7 @@ async function handleAdminCancelBooking(env, pathname) {
 
   await sendEmail(env, {
     to: updated.email,
-    subject: `Your request for ${updated.event_date} has been canceled`,
+    subject: `Your request for ${formatDate(updated.event_date)} has been canceled`,
     html: bookingCanceledEmailToCustomer(env, updated),
   }).catch(() => {});
 
@@ -1167,12 +1168,12 @@ async function handleDepositPaid(env, intent) {
 
   await sendEmail(env, {
     to: confirmed.email,
-    subject: `Deposit received — ${confirmed.event_date} is booked!`,
+    subject: `Deposit received — ${formatDate(confirmed.event_date)} is booked!`,
     html: depositConfirmedEmail(env, confirmed),
   });
   await sendEmail(env, {
     to: env.CLIENT_NOTIFY_EMAIL,
-    subject: `Deposit paid — ${confirmed.event_date} (${confirmed.name})`,
+    subject: `Deposit paid — ${formatDate(confirmed.event_date)} (${confirmed.name})`,
     html: depositPaidAdminNotice(env, confirmed),
   });
 }

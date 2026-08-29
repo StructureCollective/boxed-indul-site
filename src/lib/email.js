@@ -38,6 +38,43 @@ function money(cents) {
   return `$${((cents || 0) / 100).toFixed(2)}`;
 }
 
+// Every date shown in an email reads as "Day, Month Date Year" (e.g.
+// "Friday, September 11, 2026") instead of the raw "2026-09-11" stored in
+// the DB -- applied to both template bodies and the subject lines built in
+// index.js, since both count as "sent via email". event_date/sale_date are
+// plain YYYY-MM-DD calendar dates with no time-of-day meaning, so this is
+// parsed as UTC midnight and formatted in UTC too -- otherwise a reader
+// west of the server's clock could see the date shift a day earlier.
+export function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+// Same "Day, Month Date Year" date, plus a time -- for real timestamps
+// (order_cutoff_at) rather than plain calendar dates, so this one keeps
+// the server's local time zone instead of forcing UTC.
+function formatDateTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const datePart = d.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const timePart = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return `${datePart} at ${timePart}`;
+}
+
 // ---------------------------------------------------------------------
 // Branded shell + building blocks -- shared by every email below so a
 // palette/logo change happens in one place. Colors and fonts mirror the
@@ -145,7 +182,7 @@ function signatureLine(env) {
 export function bookingRequestEmailToClient(env, booking) {
   const body = `
     ${emailHeading("New order request")}
-    <p style="margin:0 0 6px;"><strong>${booking.name}</strong> requested a boxed meal order for <strong>${booking.event_date}</strong>.</p>
+    <p style="margin:0 0 6px;"><strong>${booking.name}</strong> requested a boxed meal order for <strong>${formatDate(booking.event_date)}</strong>.</p>
     ${summaryBox(
       [
         summaryRow("Occasion", booking.event_type),
@@ -170,7 +207,7 @@ export function bookingRequestEmailToClient(env, booking) {
 export function bookingReceivedEmailToCustomer(env, booking) {
   const body = `
     ${emailHeading(`Thanks, ${booking.name}!`)}
-    <p>We received your order request for <strong>${booking.event_date}</strong> and it's now pending review.</p>
+    <p>We received your order request for <strong>${formatDate(booking.event_date)}</strong> and it's now pending review.</p>
     <p>You'll get a follow-up email as soon as it's approved, along with a secure link to pay your ${
       booking.deposit_percent || 50
     }% deposit and lock in the date.</p>
@@ -187,7 +224,7 @@ export function bookingReceivedEmailToCustomer(env, booking) {
 export function bookingApprovedEmailToCustomer(env, booking, checkoutPageUrl) {
   const body = `
     ${emailHeading(`You're approved!`)}
-    <p>Hi ${booking.name}, your order request for <strong>${booking.event_date}</strong> has been approved.</p>
+    <p>Hi ${booking.name}, your order request for <strong>${formatDate(booking.event_date)}</strong> has been approved.</p>
     ${summaryBox(
       [
         summaryRow("Order total", money(booking.order_total_cents)),
@@ -208,7 +245,7 @@ export function bookingApprovedEmailToCustomer(env, booking, checkoutPageUrl) {
 export function bookingRejectedEmailToCustomer(env, booking) {
   const body = `
     ${emailHeading("Update on your request")}
-    <p>Hi ${booking.name}, unfortunately we're not able to accommodate your request for <strong>${booking.event_date}</strong>.</p>
+    <p>Hi ${booking.name}, unfortunately we're not able to accommodate your request for <strong>${formatDate(booking.event_date)}</strong>.</p>
     <p>Please reach out or submit a new request with alternate dates — we'd love to find a fit.</p>
     ${signatureLine(env)}
   `;
@@ -218,7 +255,7 @@ export function bookingRejectedEmailToCustomer(env, booking) {
 export function bookingCanceledEmailToCustomer(env, booking) {
   const body = `
     ${emailHeading("Your order has been canceled")}
-    <p>Hi ${booking.name}, your order for <strong>${booking.event_date}</strong> has been canceled and the date has been released.</p>
+    <p>Hi ${booking.name}, your order for <strong>${formatDate(booking.event_date)}</strong> has been canceled and the date has been released.</p>
     <p>If this wasn't expected, or you'd like to submit a new request, just reply to this email — we're happy to help.</p>
     ${signatureLine(env)}
   `;
@@ -228,7 +265,7 @@ export function bookingCanceledEmailToCustomer(env, booking) {
 export function depositConfirmedEmail(env, booking) {
   const body = `
     ${emailHeading("You're booked!")}
-    <p>Hi ${booking.name}, your ${money(booking.deposit_amount_cents)} deposit is confirmed and <strong>${booking.event_date}</strong> is locked in.</p>
+    <p>Hi ${booking.name}, your ${money(booking.deposit_amount_cents)} deposit is confirmed and <strong>${formatDate(booking.event_date)}</strong> is locked in.</p>
     <p>We'll be in touch about final details closer to the delivery date.</p>
     ${signatureLine(env)}
   `;
@@ -244,7 +281,7 @@ export function contactMessageEmailToClient(env, msg) {
         summaryRow("Email", msg.email),
         summaryRow("Phone", msg.phone || "—"),
         summaryRow("Boxes", msg.guest_count || "—"),
-        summaryRow("Date", msg.event_date || "—"),
+        summaryRow("Date", msg.event_date ? formatDate(msg.event_date) : "—"),
         summaryRow("Location", msg.location || "—"),
         summaryRow("Budget", msg.budget || "—"),
       ].join("")
@@ -300,7 +337,7 @@ export function lunchSalePaymentLinkEmail(env, order, event, checkoutPageUrl) {
       ].join("")
     )}
     ${emailButton(checkoutPageUrl, "Pay now")}
-    <p style="color:${COLORS.muted};font-size:13px;text-align:center;">Orders for this sale close ${new Date(event.order_cutoff_at).toLocaleString()}.</p>
+    <p style="color:${COLORS.muted};font-size:13px;text-align:center;">Orders for this sale close ${formatDateTime(event.order_cutoff_at)}.</p>
     ${signatureLine(env)}
   `;
   return emailShell(env, body);
@@ -324,7 +361,7 @@ export function lunchSaleNowLiveEmail(env, event) {
     ${summaryBox(
       [
         summaryRow("Price", money(event.price_cents)),
-        summaryRow("Orders close", new Date(event.order_cutoff_at).toLocaleString()),
+        summaryRow("Orders close", formatDateTime(event.order_cutoff_at)),
       ].join("")
     )}
     ${emailButton(`${env.SITE_URL}/lunch-sale/`, "Order now")}
@@ -342,7 +379,7 @@ export function lunchSaleNowLiveEmail(env, event) {
 export function depositPaidAdminNotice(env, confirmed) {
   const body = `
     ${emailHeading("Deposit paid")}
-    <p>${confirmed.name} paid their deposit for <strong>${confirmed.event_date}</strong>. Booking confirmed.</p>
+    <p>${confirmed.name} paid their deposit for <strong>${formatDate(confirmed.event_date)}</strong>. Booking confirmed.</p>
   `;
   return emailShell(env, body);
 }
