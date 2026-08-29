@@ -11,6 +11,8 @@ import {
   insertBooking,
   getBooking,
   updateBookingStatus,
+  setBookingArchived,
+  deleteBooking,
   listPendingBookings,
   listAllBookings,
   listBookedDatesInRange,
@@ -43,6 +45,7 @@ import {
   bookingReceivedEmailToCustomer,
   bookingApprovedEmailToCustomer,
   bookingRejectedEmailToCustomer,
+  bookingCanceledEmailToCustomer,
   depositConfirmedEmail,
   contactMessageEmailToClient,
   lunchSaleOrderReceivedEmailToClient,
@@ -199,6 +202,24 @@ async function routeAdmin(request, env, pathname, identity) {
     request.method === "POST"
   ) {
     return handleAdminResendDepositLink(env, pathname);
+  }
+  if (
+    pathname.match(/^\/api\/admin\/bookings\/[^/]+\/cancel$/) &&
+    request.method === "POST"
+  ) {
+    return handleAdminCancelBooking(env, pathname);
+  }
+  if (
+    pathname.match(/^\/api\/admin\/bookings\/[^/]+$/) &&
+    request.method === "PATCH"
+  ) {
+    return handleAdminUpdateBooking(request, env, pathname);
+  }
+  if (
+    pathname.match(/^\/api\/admin\/bookings\/[^/]+$/) &&
+    request.method === "DELETE"
+  ) {
+    return handleAdminDeleteBooking(env, pathname);
   }
   if (pathname === "/api/admin/contacts" && request.method === "GET") {
     return json({ contacts: await listAllContactMessages(env) });
@@ -777,6 +798,68 @@ async function handleAdminResendDepositLink(env, pathname) {
     html: bookingApprovedEmailToCustomer(env, updated, checkoutPageUrl),
   });
 
+  return json({ ok: true });
+}
+
+// A booking counts as "paid" once either the row's status has flipped to
+// confirmed or Stripe has actually settled the deposit — check both since
+// a webhook race could in theory update one before the other.
+function bookingIsPaid(booking) {
+  return booking.status === "confirmed" || booking.stripe_payment_status === "paid";
+}
+
+async function handleAdminCancelBooking(env, pathname) {
+  const id = pathname.split("/")[4];
+  const booking = await getBooking(env, id);
+  if (!booking) return json({ error: "Not found" }, 404);
+  if (bookingIsPaid(booking)) {
+    return json(
+      { error: "Can't cancel — a deposit has already been paid on this order. Contact the customer directly about a refund." },
+      400
+    );
+  }
+
+  await updateBookingStatus(env, id, "canceled");
+  const updated = await getBooking(env, id);
+
+  await sendEmail(env, {
+    to: updated.email,
+    subject: `Your request for ${updated.event_date} has been canceled`,
+    html: bookingCanceledEmailToCustomer(env, updated),
+  }).catch(() => {});
+
+  return json({ ok: true });
+}
+
+// PATCH is currently just the archive toggle — hides a closed-out order
+// from the default list without touching its status or payment record.
+async function handleAdminUpdateBooking(request, env, pathname) {
+  const id = pathname.split("/")[4];
+  const booking = await getBooking(env, id);
+  if (!booking) return json({ error: "Not found" }, 404);
+
+  const body = await request.json().catch(() => null);
+  if (!body || body.archived === undefined) return badRequest("Nothing to update");
+
+  await setBookingArchived(env, id, body.archived);
+  return json({ ok: true, booking: await getBooking(env, id) });
+}
+
+async function handleAdminDeleteBooking(env, pathname) {
+  const id = pathname.split("/")[4];
+  const booking = await getBooking(env, id);
+  if (!booking) return json({ error: "Not found" }, 404);
+  if (bookingIsPaid(booking)) {
+    return json(
+      {
+        error:
+          "Can't delete — a deposit has been paid on this order. Archive it instead to hide it from the list while keeping the payment record intact.",
+      },
+      400
+    );
+  }
+
+  await deleteBooking(env, id);
   return json({ ok: true });
 }
 

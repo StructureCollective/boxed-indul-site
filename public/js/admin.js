@@ -86,6 +86,7 @@ async function api(path, opts = {}) {
 function wireBookings() {
   document.getElementById("bookingsRefresh").addEventListener("click", loadBookings);
   document.getElementById("bookingsSearch").addEventListener("input", renderBookings);
+  document.getElementById("showArchivedBookings").addEventListener("change", renderBookings);
 }
 
 async function loadBookings() {
@@ -102,20 +103,29 @@ async function loadBookings() {
 
 function renderBookings() {
   const q = document.getElementById("bookingsSearch").value.trim().toLowerCase();
+  const showArchived = document.getElementById("showArchivedBookings")?.checked;
+  const base = showArchived ? bookings : bookings.filter((b) => !b.archived);
+  const archivedCount = bookings.length - bookings.filter((b) => !b.archived).length;
   const filtered = q
-    ? bookings.filter((b) =>
+    ? base.filter((b) =>
         [b.name, b.email, b.event_date, b.event_type, b.location].some((v) =>
           String(v || "").toLowerCase().includes(q)
         )
       )
-    : bookings;
+    : base;
 
   const body = document.getElementById("bookingsBody");
+  const hiddenNote =
+    !showArchived && archivedCount
+      ? `<tr><td colspan="8" class="subtle">${archivedCount} archived order${
+          archivedCount === 1 ? "" : "s"
+        } hidden — check "Show archived" above to see ${archivedCount === 1 ? "it" : "them"}.</td></tr>`
+      : "";
   if (!filtered.length) {
-    body.innerHTML = `<tr><td colspan="8" class="subtle">No orders found.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="8" class="subtle">No orders found.</td></tr>` + hiddenNote;
     return;
   }
-  body.innerHTML = filtered.map(bookingRow).join("");
+  body.innerHTML = filtered.map(bookingRow).join("") + hiddenNote;
 
   body.querySelectorAll("[data-approve]").forEach((btn) =>
     btn.addEventListener("click", () => approveBooking(btn.dataset.approve))
@@ -129,6 +139,18 @@ function renderBookings() {
   body.querySelectorAll("[data-resend]").forEach((btn) =>
     btn.addEventListener("click", () => resendDepositLink(btn.dataset.resend))
   );
+  body.querySelectorAll("[data-cancel-booking]").forEach((btn) =>
+    btn.addEventListener("click", () => cancelBooking(btn.dataset.cancelBooking))
+  );
+  body.querySelectorAll("[data-archive-booking]").forEach((btn) =>
+    btn.addEventListener("click", () => setBookingArchived(btn.dataset.archiveBooking, true))
+  );
+  body.querySelectorAll("[data-unarchive-booking]").forEach((btn) =>
+    btn.addEventListener("click", () => setBookingArchived(btn.dataset.unarchiveBooking, false))
+  );
+  body.querySelectorAll("[data-delete-booking]").forEach((btn) =>
+    btn.addEventListener("click", () => deleteBooking(btn.dataset.deleteBooking))
+  );
   body.querySelectorAll("[data-details]").forEach((btn) =>
     btn.addEventListener("click", () => toggleDetails(btn.dataset.details))
   );
@@ -139,6 +161,7 @@ const BOOKING_STATUS_LABELS = {
   approved: "Awaiting Deposit",
   rejected: "Rejected",
   confirmed: "Deposit Paid",
+  canceled: "Canceled",
 };
 
 function bookingRow(b) {
@@ -146,6 +169,10 @@ function bookingRow(b) {
   const deposit = b.deposit_amount_cents != null ? `$${(b.deposit_amount_cents / 100).toFixed(2)}` : "—";
   const statusClass = `status-${b.status === "pending_approval" ? "pending" : b.status}`;
   const statusLabel = BOOKING_STATUS_LABELS[b.status] || b.status.replace(/_/g, " ");
+  // Paid orders (status confirmed, or Stripe already settled) are the only
+  // ones Cancel/Delete stay off-limits for — the API blocks it too, but
+  // hiding the buttons here avoids a round trip just to get told no.
+  const isPaid = b.status === "confirmed" || b.stripe_payment_status === "paid";
 
   let actions = `<button class="btn btn-outline" data-details="${b.id}" style="padding:6px 12px;font-size:0.7rem;">Details</button>`;
   if (b.status === "pending_approval") {
@@ -154,7 +181,17 @@ function bookingRow(b) {
       <button class="btn btn-outline" data-approve-edit="${b.id}">Edit &amp; Approve</button>
       <button class="btn btn-outline" data-reject="${b.id}" style="border-color:var(--maroon);color:var(--maroon);">Reject</button>`;
   } else if (b.status === "approved") {
-    actions += `<button class="btn btn-outline" data-resend="${b.id}">Resend Deposit Link</button>`;
+    actions += `
+      <button class="btn btn-outline" data-resend="${b.id}">Resend Deposit Link</button>
+      <button class="btn btn-outline" data-cancel-booking="${b.id}" style="border-color:var(--maroon);color:var(--maroon);">Cancel</button>`;
+  }
+  if (b.archived) {
+    actions += `<button class="btn btn-outline" data-unarchive-booking="${b.id}">Unarchive</button>`;
+  } else {
+    actions += `<button class="btn btn-outline" data-archive-booking="${b.id}">Archive</button>`;
+  }
+  if (!isPaid) {
+    actions += `<button class="btn btn-outline" data-delete-booking="${b.id}" style="border-color:var(--maroon);color:var(--maroon);">Delete</button>`;
   }
 
   return `
@@ -165,7 +202,10 @@ function bookingRow(b) {
       <td>${escapeHtml(String(b.guest_count ?? "—"))}</td>
       <td>${total}</td>
       <td>${deposit}</td>
-      <td><span class="status-pill ${statusClass}">${escapeHtml(statusLabel)}</span></td>
+      <td>
+        <span class="status-pill ${statusClass}">${escapeHtml(statusLabel)}</span>
+        ${b.archived ? `<span class="status-pill status-rejected">archived</span>` : ""}
+      </td>
       <td><div class="row-actions">${actions}</div></td>
     </tr>
     <tr id="details-${b.id}" style="display:none;">
@@ -257,6 +297,41 @@ async function resendDepositLink(id) {
   try {
     await api(`/api/admin/bookings/${id}/resend-deposit-link`, { method: "POST" });
     showGlobalMsg("success", "Deposit link resent with a fresh expiration.");
+    loadBookings();
+  } catch (err) {
+    showGlobalMsg("error", err.message);
+  }
+}
+
+async function cancelBooking(id) {
+  if (!confirm("Cancel this order? The customer will be notified by email and the date will be released.")) return;
+  try {
+    await api(`/api/admin/bookings/${id}/cancel`, { method: "POST" });
+    showGlobalMsg("success", "Order canceled — the customer has been notified.");
+    loadBookings();
+  } catch (err) {
+    showGlobalMsg("error", err.message);
+  }
+}
+
+async function setBookingArchived(id, archived) {
+  try {
+    await api(`/api/admin/bookings/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ archived }),
+    });
+    showGlobalMsg("success", archived ? "Order archived." : "Order unarchived.");
+    loadBookings();
+  } catch (err) {
+    showGlobalMsg("error", err.message);
+  }
+}
+
+async function deleteBooking(id) {
+  if (!confirm("Permanently delete this order? This can't be undone.")) return;
+  try {
+    await api(`/api/admin/bookings/${id}`, { method: "DELETE" });
+    showGlobalMsg("success", "Order deleted.");
     loadBookings();
   } catch (err) {
     showGlobalMsg("error", err.message);

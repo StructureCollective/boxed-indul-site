@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   order_total_cents INTEGER,
 
   status TEXT NOT NULL DEFAULT 'pending_approval',
-    -- pending_approval | approved | rejected | confirmed (deposit paid) | expired
+    -- pending_approval | approved | rejected | confirmed (deposit paid)
+    -- | canceled (admin called it off pre-payment) | expired
   deposit_percent INTEGER,                  -- e.g. 25 = 25% of order_total_cents
   deposit_amount_cents INTEGER,
   deposit_link_expires_at TEXT,             -- ISO timestamp; app-enforced (Stripe caps at 24h)
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   stripe_payment_intent_id TEXT,            -- embedded Payment/Express Checkout Element flow
   stripe_payment_status TEXT DEFAULT 'unpaid',
   google_calendar_event_id TEXT,            -- set once pushed to the connected calendar
+  archived INTEGER NOT NULL DEFAULT 0,      -- hides a closed-out order from the default admin list
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

@@ -57,6 +57,12 @@ added, also run `migration-cutoff-extended.sql` in the D1 Console — it adds
 the `cutoff_extended` column `schema.sql` now includes by default. Safe to
 run more than once.
 
+If your database already existed before Cancel/Archive/Delete was added for
+custom orders, also run `migration-archive-cancel-bookings.sql` in the D1
+Console — it adds the `archived` column `schema.sql` now includes by
+default (canceling an order just reuses the existing `status` column, no
+schema change needed for that part). Safe to run more than once.
+
 ### 2. Set up Cloudflare Access (Zero Trust) for `/admin/*`
 
 This is what replaces the old admin passcode with a real sign-in — only the
@@ -268,5 +274,6 @@ migration-payment-intents.sql     Adds stripe_payment_intent_id columns to an al
 migration-site-settings.sql       Adds the site_settings table (order menus + occasions) and lunch_sale_events.image_url to an already-created D1 database
 migration-archive-lunch-events.sql Adds the lunch_sale_events.archived column to an already-created D1 database
 migration-cutoff-extended.sql     Adds the lunch_sale_events.cutoff_extended column to an already-created D1 database
+migration-archive-cancel-bookings.sql Adds the bookings.archived column to an already-created D1 database
 wrangler.jsonc                    Cloudflare config (Worker + D1 + vars)
 ```

@@ -548,3 +548,4 @@ table.data-table .row-actions .btn { padding: 6px 12px; font-size: 0.7rem; }
 .status-approved { background: rgba(182,134,47,0.22); color: var(--rust-dark); }
 .status-confirmed { background: rgba(85,96,63,0.28); color: var(--green-dark); }
 .status-rejected { background: rgba(122,46,46,0.14); color: var(--maroon); }
+.status-canceled { background: rgba(122,46,46,0.14); color: var(--maroon); }

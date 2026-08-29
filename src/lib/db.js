@@ -49,6 +49,19 @@ export async function updateBookingStatus(env, id, status, extra = {}) {
     .run();
 }
 
+export async function setBookingArchived(env, id, archived) {
+  await env.DB.prepare("UPDATE bookings SET archived = ?, updated_at = ? WHERE id = ?")
+    .bind(archived ? 1 : 0, new Date().toISOString(), id)
+    .run();
+}
+
+// Only ever called on a booking that hasn't been paid (the route checks
+// first) — a real paid order gets Archived, not deleted, so the payment
+// history stays intact.
+export async function deleteBooking(env, id) {
+  await env.DB.prepare("DELETE FROM bookings WHERE id = ?").bind(id).run();
+}
+
 export async function listPendingBookings(env) {
   const { results } = await env.DB.prepare(
     "SELECT * FROM bookings WHERE status = 'pending_approval' ORDER BY event_date ASC"

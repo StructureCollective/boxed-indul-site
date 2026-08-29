@@ -215,6 +215,16 @@ export function bookingRejectedEmailToCustomer(env, booking) {
   return emailShell(env, body);
 }
 
+export function bookingCanceledEmailToCustomer(env, booking) {
+  const body = `
+    ${emailHeading("Your order has been canceled")}
+    <p>Hi ${booking.name}, your order for <strong>${booking.event_date}</strong> has been canceled and the date has been released.</p>
+    <p>If this wasn't expected, or you'd like to submit a new request, just reply to this email — we're happy to help.</p>
+    ${signatureLine(env)}
+  `;
+  return emailShell(env, body);
+}
+
 export function depositConfirmedEmail(env, booking) {
   const body = `
     ${emailHeading("You're booked!")}
