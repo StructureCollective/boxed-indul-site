@@ -50,6 +50,8 @@ import {
   lunchSalePaymentLinkEmail,
   lunchSaleSignupConfirmedEmail,
   lunchSaleNowLiveEmail,
+  depositPaidAdminNotice,
+  lunchOrderPaidAdminNotice,
 } from "./lib/email.js";
 import {
   createDepositPaymentIntent,
@@ -1088,7 +1090,7 @@ async function handleDepositPaid(env, intent) {
   await sendEmail(env, {
     to: env.CLIENT_NOTIFY_EMAIL,
     subject: `Deposit paid — ${confirmed.event_date} (${confirmed.name})`,
-    html: `<p>${confirmed.name} paid their deposit for ${confirmed.event_date}. Booking confirmed.</p>`,
+    html: depositPaidAdminNotice(env, confirmed),
   });
 }
 
@@ -1115,8 +1117,6 @@ async function handleLunchSalePaid(env, intent) {
   await sendEmail(env, {
     to: env.CLIENT_NOTIFY_EMAIL,
     subject: `Lunch order paid — ${event.title} (${paidOrder.name})`,
-    html: `<p>${paidOrder.name} paid for their lunch order — ${paidOrder.quantity} × ${event.title}, $${(
-      paidOrder.total_cents / 100
-    ).toFixed(2)} total. Drop-off: ${paidOrder.dropoff_choice}.</p>`,
+    html: lunchOrderPaidAdminNotice(env, paidOrder, event),
   });
 }
