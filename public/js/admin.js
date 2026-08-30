@@ -1397,39 +1397,51 @@ function renderDashboardLunchSale() {
   const el = document.getElementById("dashLunchSale");
   if (!el) return;
 
-  const live = lunchEvents
-    .filter((ev) => ev.status === "live")
-    .sort((a, b) => new Date(a.sale_date) - new Date(b.sale_date))[0];
+  // Always show the most recently created lunch sale, regardless of its
+  // status (draft/live/closed/canceled) or whether its cutoff has passed —
+  // only an explicitly archived event is excluded. Previously this filtered
+  // to status === "live" and sorted by sale_date ascending, which meant an
+  // old sale nobody archived (even one long past its cutoff) would keep
+  // outranking a newer one. See admin's report: an "ended early" test sale
+  // wasn't showing up because an older, never-archived sale had an earlier
+  // sale_date and was still technically "live".
+  const current = lunchEvents
+    .filter((ev) => !ev.archived)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
 
-  if (!live) {
-    el.innerHTML = `<p class="subtle">No live lunch sale right now — create or activate one from the Lunch Sale tab.</p>`;
+  if (!current) {
+    el.innerHTML = `<p class="subtle">No lunch sale yet — create one from the Lunch Sale tab.</p>`;
     return;
   }
 
-  const orders = lunchOrders.filter((o) => o.event_id === live.id);
+  const orders = lunchOrders.filter((o) => o.event_id === current.id);
   const paid = orders.filter((o) => o.status === "paid");
   const paidQty = paid.reduce((sum, o) => sum + (o.quantity || 0), 0);
   const paidTotal = paid.reduce((sum, o) => sum + (o.total_cents || 0), 0);
   const dropoffs =
-    parseOrderItems(live.dropoff_options)
+    parseOrderItems(current.dropoff_options)
       .map((d) => `${d.time} — ${d.location}`)
       .join(" · ") || "—";
-  const cutoffPassed = new Date(live.order_cutoff_at).getTime() < Date.now();
+  const cutoffPassed = new Date(current.order_cutoff_at).getTime() < Date.now();
+
+  // Same status-pill logic used in the Lunch Sale tab's own event cards, so
+  // a draft/closed/canceled sale reads correctly here too, not just live ones.
+  const statusPill = cutoffPassed
+    ? `<span class="status-pill status-ended">ended</span>`
+    : current.status === "live"
+    ? `<span class="status-pill status-live-flash">live</span>`
+    : `<span class="status-pill status-${escapeHtml(current.status)}">${escapeHtml(current.status)}</span>`;
 
   el.innerHTML = `
     <div class="dash-stats">
-      <div class="dash-stat"><span class="num">${escapeHtml(String(live.slot_cap))}</span><span class="label">Lunch Cap</span></div>
-      <div class="dash-stat"><span class="num">$${(live.price_cents / 100).toFixed(2)}</span><span class="label">Price / Lunch</span></div>
-      <div class="dash-stat"><span class="num">${paidQty}/${live.slot_cap}</span><span class="label">Lunches Paid</span></div>
+      <div class="dash-stat"><span class="num">${escapeHtml(String(current.slot_cap))}</span><span class="label">Lunch Cap</span></div>
+      <div class="dash-stat"><span class="num">$${(current.price_cents / 100).toFixed(2)}</span><span class="label">Price / Lunch</span></div>
+      <div class="dash-stat"><span class="num">${paidQty}/${current.slot_cap}</span><span class="label">Lunches Paid</span></div>
       <div class="dash-stat"><span class="num">$${(paidTotal / 100).toFixed(2)}</span><span class="label">Payments Received</span></div>
     </div>
-    <p style="margin:14px 0 4px;"><strong>${escapeHtml(live.title)}</strong> ${
-    cutoffPassed
-      ? `<span class="status-pill status-ended">ended</span>`
-      : `<span class="status-pill status-live-flash">live</span>`
-  }</p>
-    <p class="subtle" style="margin-bottom:4px;">For ${escapeHtml(formatShortDate(live.sale_date))} · cutoff ${escapeHtml(
-    formatDateTime(live.order_cutoff_at)
+    <p style="margin:14px 0 4px;"><strong>${escapeHtml(current.title)}</strong> ${statusPill}</p>
+    <p class="subtle" style="margin-bottom:4px;">For ${escapeHtml(formatShortDate(current.sale_date))} · cutoff ${escapeHtml(
+    formatDateTime(current.order_cutoff_at)
   )}</p>
     <p class="subtle" style="margin-bottom:0;">Drop-off: ${escapeHtml(dropoffs)}</p>
     <button type="button" class="btn btn-outline" style="margin-top:14px;padding:8px 16px;font-size:0.72rem;" data-goto-lunch>View in Lunch Sale tab</button>`;
