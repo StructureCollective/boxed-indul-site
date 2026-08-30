@@ -2,12 +2,13 @@
   "name": "boxed-indulgence-site",
   "version": "1.0.0",
   "private": true,
-  "description": "Boxed Indulgence indulgent boxed catered meals site — static frontend + Cloudflare Worker API (ordering, contact, admin approval, Stripe test-mode deposits).",
+  "description": "Boxed Indulgence indulgent boxed catered meals site \u2014 static frontend + Cloudflare Worker API (ordering, contact, admin approval, Stripe test-mode deposits).",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:init": "wrangler d1 execute boxed-indulgence-db --file=./schema.sql",
-    "db:init:remote": "wrangler d1 execute boxed-indulgence-db --remote --file=./schema.sql"
+    "db:init:remote": "wrangler d1 execute boxed-indulgence-db --remote --file=./schema.sql",
+    "test:email": "node scripts/send-test-email.js"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"
