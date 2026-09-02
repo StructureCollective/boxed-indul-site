@@ -343,11 +343,37 @@ export function lunchSalePaymentLinkEmail(env, order, event, checkoutPageUrl) {
   return emailShell(env, body);
 }
 
-export function lunchSaleSignupConfirmedEmail(env) {
+export function lunchSaleSignupConfirmedEmail(env, jobLabel) {
   const body = `
     ${emailHeading("You're on the list!")}
-    <p>We'll email you the moment the next lunch sale opens.</p>
+    <p>${
+      jobLabel
+        ? `Thanks for your interest in lunch drop-off for <strong>${jobLabel}</strong> — we'll be in touch soon.`
+        : `We'll email you the moment the next lunch sale opens.`
+    }</p>
     ${signatureLine(env)}
+  `;
+  return emailShell(env, body);
+}
+
+// Sent to the caterer (CLIENT_NOTIFY_EMAIL) the moment someone submits a
+// targeted /interest/ page — NOT sent for the general /lunch-sale/ "Get
+// Notified" signups, which stay silent (same as before this existed):
+// those are lower-intent/higher-volume than a specific outreach lead, so
+// only the targeted ones page the caterer directly.
+export function lunchSaleInterestLeadEmailToClient(env, signup, jobLabel) {
+  const body = `
+    ${emailHeading("New interest lead")}
+    <p style="margin:0 0 6px;">Someone signed up on the <strong>${jobLabel}</strong> interest page.</p>
+    ${summaryBox(
+      [
+        summaryRow("Job / Location", jobLabel),
+        summaryRow("Contact", signup.contact_name || "—"),
+        summaryRow("Email", signup.email),
+        summaryRow("Phone", signup.phone || "—"),
+      ].join("")
+    )}
+    ${emailButton(`${env.SITE_URL}/admin/`, "View in admin")}
   `;
   return emailShell(env, body);
 }

@@ -302,12 +302,17 @@
     <div class="admin-card">
       <div class="admin-toolbar">
         <h3 style="margin:0;">Notify-Me Signups</h3>
-        <button class="btn btn-outline" id="signupsRefresh">Refresh</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <select id="signupsJobFilter" style="padding:10px 12px;border:1px solid var(--line);border-radius:6px;font-family:var(--font-body);font-size:0.82rem;">
+            <option value="">All (general list + every job)</option>
+          </select>
+          <button class="btn btn-outline" id="signupsRefresh">Refresh</button>
+        </div>
       </div>
       <div class="table-wrap">
         <table class="data-table" id="signupsTable">
-          <thead><tr><th>Email</th><th>Signed Up</th></tr></thead>
-          <tbody id="signupsBody"><tr><td colspan="2" class="subtle">Loading…</td></tr></tbody>
+          <thead><tr><th>Job / Location</th><th>Contact</th><th>Email</th><th>Phone</th><th>Signed Up</th></tr></thead>
+          <tbody id="signupsBody"><tr><td colspan="5" class="subtle">Loading…</td></tr></tbody>
         </table>
       </div>
     </div>

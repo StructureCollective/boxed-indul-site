@@ -304,13 +304,30 @@ export async function listAllLunchSaleOrders(env) {
   return results;
 }
 
-// ---- lunch-sale "notify me" signups ---------------------------------------
+// ---- lunch-sale "notify me" / interest signups -----------------------------
 
+// One row per email overall. Signing up again under a different source
+// (e.g. someone already on the general list later fills out a targeted
+// /interest/ page) updates that row's source/contact_name/phone in place
+// rather than creating a duplicate — created_at keeps the original signup
+// date.
 export async function insertLunchSaleSignup(env, signup) {
   await env.DB.prepare(
-    "INSERT OR IGNORE INTO lunch_sale_signups (id, email, created_at) VALUES (?,?,?)"
+    `INSERT INTO lunch_sale_signups (id, email, source, contact_name, phone, created_at)
+     VALUES (?,?,?,?,?,?)
+     ON CONFLICT(email) DO UPDATE SET
+       source = excluded.source,
+       contact_name = excluded.contact_name,
+       phone = excluded.phone`
   )
-    .bind(signup.id, signup.email, signup.created_at)
+    .bind(
+      signup.id,
+      signup.email,
+      signup.source,
+      signup.contact_name || null,
+      signup.phone || null,
+      signup.created_at
+    )
     .run();
 }
 

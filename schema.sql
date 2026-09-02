@@ -111,12 +111,21 @@ CREATE TABLE IF NOT EXISTS lunch_sale_orders (
 CREATE INDEX IF NOT EXISTS idx_lunch_orders_event ON lunch_sale_orders(event_id);
 CREATE INDEX IF NOT EXISTS idx_lunch_orders_status ON lunch_sale_orders(status);
 
--- "Sign up" list for when no lunch sale is currently live — captured from
--- the /lunch-sale/notify/ page and notified by the admin when a new event
--- goes live (manual send for now; a real broadcast tool can replace this later).
+-- "Sign up" list for when no lunch sale is currently live, plus the
+-- targeted "interest" pages for specific drop-off businesses/locations
+-- (see src/lib/jobs.js and /interest/?job=<slug>) — notified by the admin
+-- when a new event goes live (manual send for now; a real broadcast tool
+-- can replace this later). `source` is 'general' for the public
+-- /lunch-sale/ signup form, or a job slug from src/lib/jobs.js for a
+-- targeted interest page. One row per email overall — signing up again
+-- under a different source updates that row's source/contact_name/phone
+-- rather than creating a duplicate.
 CREATE TABLE IF NOT EXISTS lunch_sale_signups (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
+  source TEXT NOT NULL DEFAULT 'general',
+  contact_name TEXT,
+  phone TEXT,
   created_at TEXT NOT NULL
 );
 

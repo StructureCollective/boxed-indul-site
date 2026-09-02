@@ -6,6 +6,7 @@ import {
   isValidDateString,
   isFutureDate,
   isValidEmail,
+  isValidPhone,
 } from "./lib/util.js";
 import {
   insertBooking,
@@ -53,6 +54,7 @@ import {
   lunchSaleOrderConfirmedEmail,
   lunchSalePaymentLinkEmail,
   lunchSaleSignupConfirmedEmail,
+  lunchSaleInterestLeadEmailToClient,
   lunchSaleNowLiveEmail,
   depositPaidAdminNotice,
   lunchOrderPaidAdminNotice,
@@ -79,6 +81,7 @@ import {
   pushBookingToCalendar,
   syncBusyDatesFromCalendar,
 } from "./lib/calendar.js";
+import { INTEREST_JOBS, GENERAL_SOURCE, isKnownSource, resolveJobLabel } from "./lib/jobs.js";
 
 export default {
   async fetch(request, env, ctx) {
@@ -123,6 +126,9 @@ export default {
       }
       if (pathname === "/api/lunch-sale/current" && request.method === "GET") {
         return handleLunchSaleCurrent(env);
+      }
+      if (pathname === "/api/lunch-sale/interest-jobs" && request.method === "GET") {
+        return json({ jobs: INTEREST_JOBS });
       }
       if (
         pathname.match(/^\/api\/lunch-sale\/[^/]+\/order$/) &&
@@ -260,7 +266,7 @@ async function routeAdmin(request, env, pathname, identity) {
     pathname.match(/^\/api\/admin\/lunch-sale\/events\/[^/]+\/notify-signups$/) &&
     request.method === "POST"
   ) {
-    return handleAdminNotifySignups(env, pathname);
+    return handleAdminNotifySignups(request, env, pathname);
   }
   if (
     pathname.match(/^\/api\/admin\/lunch-sale\/events\/[^/]+$/) &&
@@ -278,7 +284,10 @@ async function routeAdmin(request, env, pathname, identity) {
     return handleAdminResendLunchSalePaymentLink(env, pathname);
   }
   if (pathname === "/api/admin/lunch-sale/signups" && request.method === "GET") {
-    return json({ signups: await listLunchSaleSignups(env) });
+    const signups = await listLunchSaleSignups(env);
+    return json({
+      signups: signups.map((s) => ({ ...s, source_label: resolveJobLabel(s.source) })),
+    });
   }
 
   // ---- menus & occasions admin (site_settings) ----
@@ -718,16 +727,47 @@ async function handleLunchSaleSignup(request, env) {
   if (!body || !body.email || !isValidEmail(body.email)) {
     return badRequest("Valid email required");
   }
-  await insertLunchSaleSignup(env, {
+  if (!body.phone || !isValidPhone(body.phone)) {
+    return badRequest("Valid phone number required");
+  }
+
+  const source = body.source || GENERAL_SOURCE;
+  if (!isKnownSource(source)) return badRequest("Unknown source");
+
+  const contactName = (body.contact_name || "").trim();
+  if (source !== GENERAL_SOURCE && !contactName) {
+    return badRequest("Name required");
+  }
+
+  const signup = {
     id: newId(),
     email: body.email,
+    source,
+    contact_name: contactName || null,
+    phone: body.phone.trim(),
     created_at: nowIso(),
-  });
+  };
+  await insertLunchSaleSignup(env, signup);
+
+  const jobLabel = source === GENERAL_SOURCE ? null : resolveJobLabel(source);
+
   await sendEmail(env, {
     to: body.email,
     subject: `You're on the list — ${env.BUSINESS_NAME}`,
-    html: lunchSaleSignupConfirmedEmail(env),
+    html: lunchSaleSignupConfirmedEmail(env, jobLabel),
   }).catch(() => {});
+
+  // Targeted interest-page leads are lower-volume/higher-intent than the
+  // general "Get Notified" list, so flag them to the caterer right away —
+  // the general list stays silent here, same as before this existed.
+  if (jobLabel) {
+    await sendEmail(env, {
+      to: env.CLIENT_NOTIFY_EMAIL,
+      subject: `New interest lead — ${jobLabel}`,
+      html: lunchSaleInterestLeadEmailToClient(env, signup, jobLabel),
+    }).catch(() => {});
+  }
+
   return json({ ok: true });
 }
 
@@ -957,12 +997,19 @@ async function handleAdminDeleteLunchSaleEvent(env, pathname) {
   return json({ ok: true });
 }
 
-async function handleAdminNotifySignups(env, pathname) {
+async function handleAdminNotifySignups(request, env, pathname) {
   const id = pathname.split("/")[5];
   const event = await getLunchSaleEvent(env, id);
   if (!event) return json({ error: "Not found" }, 404);
 
-  const signups = await listLunchSaleSignups(env);
+  // Optional { source } in the body scopes this to whatever the admin had
+  // the Notify-Me Signups table filtered to at the time — omitted/empty
+  // means "everyone", same as the original behavior.
+  const body = await request.json().catch(() => null);
+  const source = body?.source || null;
+
+  const allSignups = await listLunchSaleSignups(env);
+  const signups = source ? allSignups.filter((s) => s.source === source) : allSignups;
   if (!signups.length) {
     return json({ ok: true, sent: 0, skipped: 0, failed: 0, total: 0, error: null });
   }

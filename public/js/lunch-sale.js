@@ -63,11 +63,16 @@ function renderNoSale(area) {
   area.innerHTML = `
     <div class="lunch-none-card">
       <p style="margin:0 0 12px;font-weight:600;color:var(--black);">No upcoming sale at this time.</p>
-      <p style="margin:0 0 24px;">Leave your email and we'll let you know the moment the next lunch sale opens.</p>
+      <p style="margin:0 0 24px;">Leave your info and we'll let you know the moment the next lunch sale opens.</p>
       <form class="form-card" id="signupForm" style="text-align:left;max-width:420px;margin:0 auto;">
         <div class="field">
           <label for="signupEmail">Email</label>
           <input type="email" id="signupEmail" name="email" required placeholder="you@example.com">
+        </div>
+        <div class="field">
+          <label for="signupPhone">Phone</label>
+          <input type="tel" id="signupPhone" name="phone" required placeholder="(555) 555-5555">
+          <p style="margin:6px 0 0;font-size:0.8rem;color:var(--muted);">By providing your phone number, you agree to receive occasional text updates about upcoming lunch sales from Boxed Indulgence. Message and data rates may apply.</p>
         </div>
         <button type="submit" class="btn btn-primary" id="signupBtn" style="width:100%;justify-content:center;">Get Notified</button>
         <div class="form-msg" id="signupMsg"></div>
@@ -82,7 +87,8 @@ async function onSignupSubmit(e) {
   const msgEl = document.getElementById("signupMsg");
   const btn = document.getElementById("signupBtn");
   const email = document.getElementById("signupEmail").value.trim();
-  if (!email) return;
+  const phone = document.getElementById("signupPhone").value.trim();
+  if (!email || !phone) return;
 
   btn.disabled = true;
   btn.textContent = "Signing Up…";
@@ -90,7 +96,7 @@ async function onSignupSubmit(e) {
     const res = await fetch("/api/lunch-sale/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, phone }),
     });
     const data = await res.json();
     if (!res.ok) {

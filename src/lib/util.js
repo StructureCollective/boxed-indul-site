@@ -40,6 +40,13 @@ export function isValidEmail(s) {
   return typeof s === "string" && EMAIL_RE.test(s);
 }
 
+const PHONE_RE = /^[0-9+()\-.\s]{7,20}$/;
+export function isValidPhone(s) {
+  if (typeof s !== "string") return false;
+  const trimmed = s.trim();
+  return PHONE_RE.test(trimmed) && trimmed.replace(/\D/g, "").length >= 7;
+}
+
 export function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;",

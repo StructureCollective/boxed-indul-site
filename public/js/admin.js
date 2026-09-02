@@ -696,11 +696,28 @@ async function deleteLunchEvent(id) {
   }
 }
 
+// Scoped to whatever the Notify-Me Signups table's job filter is set to
+// right now (even if that panel isn't the one currently open) — "All"
+// still means everyone, same as the original behavior.
 async function notifySignups(id) {
+  const filterSel = document.getElementById("signupsJobFilter");
+  const source = filterSel ? filterSel.value : "";
+  const scopeLabel = source ? filterSel.options[filterSel.selectedIndex].textContent : "everyone on the signup list";
+
+  if (!confirm(`Send this event's "now open" email to ${scopeLabel}?`)) return;
+
   try {
-    const data = await api(`/api/admin/lunch-sale/events/${id}/notify-signups`, { method: "POST" });
+    const data = await api(`/api/admin/lunch-sale/events/${id}/notify-signups`, {
+      method: "POST",
+      body: JSON.stringify({ source }),
+    });
     if (!data.total) {
-      showGlobalMsg("error", "No one has signed up for notifications yet — the signup list is empty.");
+      showGlobalMsg(
+        "error",
+        source
+          ? `No one matches the "${scopeLabel}" filter — nothing was sent.`
+          : "No one has signed up for notifications yet — the signup list is empty."
+      );
     } else if (data.skipped) {
       showGlobalMsg(
         "error",
@@ -714,7 +731,7 @@ async function notifySignups(id) {
         }.`
       );
     } else {
-      showGlobalMsg("success", `Notified ${data.sent} of ${data.total} signed-up email(s).`);
+      showGlobalMsg("success", `Notified ${data.sent} of ${data.total} signed-up email(s) — ${scopeLabel}.`);
     }
   } catch (err) {
     showGlobalMsg("error", err.message);
@@ -731,6 +748,7 @@ function wireLunchOrders() {
     exportOrdersToExcel(getFilteredOrders(), currentOrdersExportName());
   });
   document.getElementById("signupsRefresh").addEventListener("click", loadSignups);
+  document.getElementById("signupsJobFilter").addEventListener("change", renderSignups);
 }
 
 async function loadLunchOrders() {
@@ -943,20 +961,52 @@ async function loadSignups() {
   try {
     const data = await api("/api/admin/lunch-sale/signups");
     signups = data.signups || [];
+    populateSignupsJobFilter();
     renderSignups();
   } catch (err) {
     showGlobalMsg("error", err.message);
   }
 }
 
+// Keeps the Notify-Me Signups job filter in sync with whatever sources
+// actually show up in the data — no separate "list of jobs" API needed.
+function populateSignupsJobFilter() {
+  const sel = document.getElementById("signupsJobFilter");
+  if (!sel) return;
+  const current = sel.value;
+  const seen = new Map();
+  signups.forEach((s) => seen.set(s.source, s.source_label || s.source));
+  const options = [`<option value="">All (general list + every job)</option>`].concat(
+    Array.from(seen.entries())
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([source, label]) => `<option value="${escapeHtml(source)}">${escapeHtml(label)}</option>`)
+  );
+  sel.innerHTML = options.join("");
+  if (current && seen.has(current)) sel.value = current;
+}
+
+function getFilteredSignups() {
+  const source = document.getElementById("signupsJobFilter").value;
+  return source ? signups.filter((s) => s.source === source) : signups;
+}
+
 function renderSignups() {
   const body = document.getElementById("signupsBody");
-  if (!signups.length) {
-    body.innerHTML = `<tr><td colspan="2" class="subtle">No signups yet.</td></tr>`;
+  const filtered = getFilteredSignups();
+  if (!filtered.length) {
+    body.innerHTML = `<tr><td colspan="5" class="subtle">No signups yet.</td></tr>`;
     return;
   }
-  body.innerHTML = signups
-    .map((s) => `<tr><td>${escapeHtml(s.email)}</td><td>${escapeHtml(formatDateTime(s.created_at))}</td></tr>`)
+  body.innerHTML = filtered
+    .map(
+      (s) => `<tr>
+        <td>${escapeHtml(s.source_label || s.source)}</td>
+        <td>${escapeHtml(s.contact_name || "—")}</td>
+        <td>${escapeHtml(s.email)}</td>
+        <td>${escapeHtml(s.phone || "—")}</td>
+        <td>${escapeHtml(formatDateTime(s.created_at))}</td>
+      </tr>`
+    )
     .join("");
 }
 
