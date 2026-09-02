@@ -1,0 +1,1 @@
+ALTER TABLE lunch_sale_signups ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;

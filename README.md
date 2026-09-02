@@ -69,6 +69,12 @@ pages were added (see "Hidden interest pages" below), also run
 `source`, `contact_name`, and `phone` columns `schema.sql` now includes by
 default. Safe to run more than once.
 
+If your database already existed before signups could be flagged as
+admin/staff (always shown regardless of the admin dashboard's job filter),
+also run `migration-signup-admin-flag.sql` in the D1 Console — it adds the
+`is_admin` column `schema.sql` now includes by default. Safe to run more
+than once.
+
 ### 2. Set up Cloudflare Access (Zero Trust) for `/admin/*`
 
 This is what replaces the old admin passcode with a real sign-in — only the
@@ -282,6 +288,7 @@ migration-archive-lunch-events.sql Adds the lunch_sale_events.archived column to
 migration-cutoff-extended.sql     Adds the lunch_sale_events.cutoff_extended column to an already-created D1 database
 migration-archive-cancel-bookings.sql Adds the bookings.archived column to an already-created D1 database
 migration-job-interest-signups.sql Adds lunch_sale_signups.source/contact_name/phone to an already-created D1 database
+migration-signup-admin-flag.sql   Adds lunch_sale_signups.is_admin to an already-created D1 database
 src/lib/jobs.js                   Registry of hidden /interest/?job=<slug> pages — add a business here, no new files needed
 public/interest/index.html        Hidden, unlisted interest page shared by every job (see src/lib/jobs.js)
 wrangler.jsonc                    Cloudflare config (Worker + D1 + vars)

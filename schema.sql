@@ -119,13 +119,17 @@ CREATE INDEX IF NOT EXISTS idx_lunch_orders_status ON lunch_sale_orders(status);
 -- /lunch-sale/ signup form, or a job slug from src/lib/jobs.js for a
 -- targeted interest page. One row per email overall — signing up again
 -- under a different source updates that row's source/contact_name/phone
--- rather than creating a duplicate.
+-- rather than creating a duplicate. `is_admin` marks trusted/staff rows
+-- (set manually via SQL, never through the public forms) that should
+-- always show up no matter which job filter the admin dashboard is set
+-- to, and always be included when notifying signups for an event.
 CREATE TABLE IF NOT EXISTS lunch_sale_signups (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
   source TEXT NOT NULL DEFAULT 'general',
   contact_name TEXT,
   phone TEXT,
+  is_admin INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
 

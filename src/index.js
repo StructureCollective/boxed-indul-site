@@ -735,7 +735,7 @@ async function handleLunchSaleSignup(request, env) {
   if (!isKnownSource(source)) return badRequest("Unknown source");
 
   const contactName = (body.contact_name || "").trim();
-  if (source !== GENERAL_SOURCE && !contactName) {
+  if (!contactName) {
     return badRequest("Name required");
   }
 
@@ -1009,7 +1009,7 @@ async function handleAdminNotifySignups(request, env, pathname) {
   const source = body?.source || null;
 
   const allSignups = await listLunchSaleSignups(env);
-  const signups = source ? allSignups.filter((s) => s.source === source) : allSignups;
+  const signups = source ? allSignups.filter((s) => s.source === source || s.is_admin) : allSignups;
   if (!signups.length) {
     return json({ ok: true, sent: 0, skipped: 0, failed: 0, total: 0, error: null });
   }

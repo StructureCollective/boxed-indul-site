@@ -987,7 +987,7 @@ function populateSignupsJobFilter() {
 
 function getFilteredSignups() {
   const source = document.getElementById("signupsJobFilter").value;
-  return source ? signups.filter((s) => s.source === source) : signups;
+  return source ? signups.filter((s) => s.source === source || s.is_admin) : signups;
 }
 
 function renderSignups() {
@@ -1000,7 +1000,9 @@ function renderSignups() {
   body.innerHTML = filtered
     .map(
       (s) => `<tr>
-        <td>${escapeHtml(s.source_label || s.source)}</td>
+        <td>${escapeHtml(s.source_label || s.source)}${
+          s.is_admin ? ' <span class="tag" style="margin-left:6px;">Admin</span>' : ""
+        }</td>
         <td>${escapeHtml(s.contact_name || "—")}</td>
         <td>${escapeHtml(s.email)}</td>
         <td>${escapeHtml(s.phone || "—")}</td>

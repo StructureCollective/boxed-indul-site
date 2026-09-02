@@ -66,6 +66,10 @@ function renderNoSale(area) {
       <p style="margin:0 0 24px;">Leave your info and we'll let you know the moment the next lunch sale opens.</p>
       <form class="form-card" id="signupForm" style="text-align:left;max-width:420px;margin:0 auto;">
         <div class="field">
+          <label for="signupName">Name</label>
+          <input type="text" id="signupName" name="name" required>
+        </div>
+        <div class="field">
           <label for="signupEmail">Email</label>
           <input type="email" id="signupEmail" name="email" required placeholder="you@example.com">
         </div>
@@ -86,9 +90,10 @@ async function onSignupSubmit(e) {
   e.preventDefault();
   const msgEl = document.getElementById("signupMsg");
   const btn = document.getElementById("signupBtn");
+  const name = document.getElementById("signupName").value.trim();
   const email = document.getElementById("signupEmail").value.trim();
   const phone = document.getElementById("signupPhone").value.trim();
-  if (!email || !phone) return;
+  if (!name || !email || !phone) return;
 
   btn.disabled = true;
   btn.textContent = "Signing Up…";
@@ -96,7 +101,7 @@ async function onSignupSubmit(e) {
     const res = await fetch("/api/lunch-sale/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, phone }),
+      body: JSON.stringify({ email, phone, contact_name: name }),
     });
     const data = await res.json();
     if (!res.ok) {
