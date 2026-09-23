@@ -356,15 +356,17 @@ export function lunchSaleSignupConfirmedEmail(env, jobLabel) {
   return emailShell(env, body);
 }
 
-// Sent to the caterer (CLIENT_NOTIFY_EMAIL) the moment someone submits a
-// targeted /interest/ page — NOT sent for the general /lunch-sale/ "Get
-// Notified" signups, which stay silent (same as before this existed):
-// those are lower-intent/higher-volume than a specific outreach lead, so
-// only the targeted ones page the caterer directly.
-export function lunchSaleInterestLeadEmailToClient(env, signup, jobLabel) {
+// Sent to the caterer (CLIENT_NOTIFY_EMAIL) the moment someone signs up —
+// either on a targeted /interest/ page (USPS, Toyota, …) or on the general
+// /lunch-sale/ "Get Notified" form (isGeneral = true, jobLabel "General List").
+export function lunchSaleInterestLeadEmailToClient(env, signup, jobLabel, isGeneral = false) {
   const body = `
     ${emailHeading("New interest lead")}
-    <p style="margin:0 0 6px;">Someone signed up on the <strong>${jobLabel}</strong> interest page.</p>
+    <p style="margin:0 0 6px;">${
+      isGeneral
+        ? `Someone joined the <strong>General List</strong> via the "Get Notified" form on the lunch sale page.`
+        : `Someone signed up on the <strong>${jobLabel}</strong> interest page.`
+    }</p>
     ${summaryBox(
       [
         summaryRow("Job / Location", jobLabel),

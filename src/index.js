@@ -757,16 +757,14 @@ async function handleLunchSaleSignup(request, env) {
     html: lunchSaleSignupConfirmedEmail(env, jobLabel),
   }).catch(() => {});
 
-  // Targeted interest-page leads are lower-volume/higher-intent than the
-  // general "Get Notified" list, so flag them to the caterer right away —
-  // the general list stays silent here, same as before this existed.
-  if (jobLabel) {
-    await sendEmail(env, {
-      to: env.CLIENT_NOTIFY_EMAIL,
-      subject: `New interest lead — ${jobLabel}`,
-      html: lunchSaleInterestLeadEmailToClient(env, signup, jobLabel),
-    }).catch(() => {});
-  }
+  // Every new lead — targeted /interest/ pages (USPS, Toyota, …) and the
+  // general /lunch-sale/ "Get Notified" list alike — pings the caterer.
+  const leadLabel = resolveJobLabel(source); // "General List" for general
+  await sendEmail(env, {
+    to: env.CLIENT_NOTIFY_EMAIL,
+    subject: `New interest lead — ${leadLabel}`,
+    html: lunchSaleInterestLeadEmailToClient(env, signup, leadLabel, !jobLabel),
+  }).catch(() => {});
 
   return json({ ok: true });
 }
